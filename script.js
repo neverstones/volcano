@@ -34,13 +34,13 @@ const GAME_CONFIG = {
                 color: '#228B22',
                 viscosity: 0.4,         // Highest viscosity near surface
                 pressure: 0.3,          // Lowest pressure
-                temperature: 400,       // Much cooler
+                temperature: 5,         // Temperatura finale molto bassa come richiesto
                 density: 1.5
             }
         }
     },
     magma: {
-        radius: 10,
+        radius: 15, // Aumentato da 10 a 15 per dimensione maggiore
         maxSpeed: 200,  // Aumentato drasticamente da 20 a 200 per azione veloce!
         // Realistic magma properties
         composition: {
@@ -58,7 +58,7 @@ const GAME_CONFIG = {
         offsetY: 150             // Keep magma this far from center
     },
     controls: {
-        horizontalForce: 8.0,    // Aumentato da 3.0 a 8.0 per controlli super-responsivi
+        horizontalForce: 25.0,    // Aumentato da 15.0 a 25.0 per controlli super-responsivi
         spaceBoostForce: 20.0,   // Aumentato da 8.0 a 20.0 per boost esplosivo
         spaceBoostCooldown: 200  // Ridotto da 500ms a 200ms per boost quasi continuo
     },
@@ -75,6 +75,14 @@ const GAME_CONFIG = {
         spawnRate: 0.6,
         pressureBoost: 1.5,      // Aumentato da 0.8 a 1.5 per boost più potente
         temperatureBoost: 400    // Aumentato da 200 a 400 per riscaldamento maggiore
+    },
+    resistantRocks: {
+        spawnRate: 0.15,          // Frequenza di spawn delle rocce resistenti
+        density: 0.8,             // Densità man mano che si sale
+        blockageStrength: 0.3,    // Ridotto da 0.95 a 0.3 per non fermare il gioco
+        minSize: 25,              // Dimensione minima
+        maxSize: 60,              // Dimensione massima
+        color: '#1C1C1C'          // Nero scuro
     },
     volcano: {
         width: 200,
@@ -548,6 +556,23 @@ class GeologicalFault {
         
         // Physical boost upward - boost esplosivo per gameplay dinamico
         magma.vy -= 15.0; // Aumentato da 5.0 a 15.0 per boost spettacolare!
+        
+        // Boost di velocità temporaneo
+        magma.faultSpeedBoost = {
+            active: true,
+            duration: 2000, // 2 secondi
+            startTime: Date.now(),
+            multiplier: 2.5 // Boost di velocità 2.5x
+        };
+        
+        // Trasformazione temporanea della forma alla faglia
+        magma.faultShapeTransform = {
+            active: true,
+            duration: 1500, // 1.5 secondi
+            startTime: Date.now(),
+            angle: this.angle,
+            intensity: 1.0
+        };
     }
 }
 
@@ -574,6 +599,7 @@ class VolcanoStructure {
         this.ashCloud = [];
         this.lightningBolts = [];
         this.lavaFlows = [];
+        this.smokeParticles = []; // Particelle di fumo nero
         
         this.eruptionPhase = 'initial'; // initial, main, explosive, declining
     }
@@ -627,6 +653,34 @@ class VolcanoStructure {
     drawCrater(ctx) {
         ctx.save();
         
+        // Disegna il cielo sopra il cratere quando visibile
+        if (this.crater.y < 100) { // Se il cratere è vicino alla superficie
+            // Gradiente del cielo
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, this.crater.y);
+            skyGradient.addColorStop(0, '#87CEEB'); // Azzurro cielo
+            skyGradient.addColorStop(0.7, '#B0C4DE'); // Azzurro più chiaro
+            skyGradient.addColorStop(1, '#F0F8FF'); // Quasi bianco verso l'orizzonte
+            
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, GAME_CONFIG.canvas.width, this.crater.y);
+            
+            // Aggiungi nuvole semplici
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            for (let i = 0; i < 3; i++) {
+                const cloudX = (i * GAME_CONFIG.canvas.width / 3) + Math.sin(Date.now() * 0.0005 + i) * 20;
+                const cloudY = 20 + i * 15;
+                
+                // Nuvola semplice con più cerchi
+                for (let j = 0; j < 5; j++) {
+                    const offsetX = (j - 2) * 15;
+                    const radius = 15 + Math.sin(Date.now() * 0.001 + j) * 3;
+                    ctx.beginPath();
+                    ctx.arc(cloudX + offsetX, cloudY, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
         // Crater rim
         ctx.strokeStyle = '#4B0000';
         ctx.lineWidth = 4;
@@ -651,9 +705,13 @@ class VolcanoStructure {
             ctx.shadowColor = '#FF4500';
             ctx.shadowBlur = 30;
         } else {
+            // Cratere normale con fumo nero
             craterGradient.addColorStop(0, '#4B0000');
             craterGradient.addColorStop(0.5, '#2F0000');
             craterGradient.addColorStop(1, '#1F0000');
+            
+            // Genera fumo nero che esce dal cratere
+            this.generateSmoke(ctx);
         }
         
         ctx.fillStyle = craterGradient;
@@ -662,6 +720,51 @@ class VolcanoStructure {
         ctx.fill();
         
         ctx.restore();
+    }
+    
+    generateSmoke(ctx) {
+        // Genera nuove particelle di fumo
+        if (Math.random() < 0.3) {
+            this.smokeParticles.push({
+                x: this.crater.x + (Math.random() - 0.5) * this.crater.radius,
+                y: this.crater.y,
+                vx: (Math.random() - 0.5) * 2,
+                vy: -Math.random() * 3 - 1,
+                size: Math.random() * 8 + 4,
+                life: 1.0,
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.02
+            });
+        }
+        
+        // Aggiorna e disegna particelle esistenti
+        this.smokeParticles = this.smokeParticles.filter(particle => {
+            // Aggiorna posizione
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.vy -= 0.05; // Gravità leggera verso l'alto
+            particle.vx *= 0.98; // Attrito
+            particle.size += 0.1; // Crescita del fumo
+            particle.life -= 0.008; // Dissolvenza
+            particle.rotation += particle.rotationSpeed;
+            
+            // Disegna particella
+            if (particle.life > 0) {
+                ctx.save();
+                ctx.translate(particle.x, particle.y);
+                ctx.rotate(particle.rotation);
+                
+                const alpha = particle.life * 0.6;
+                ctx.fillStyle = `rgba(30, 30, 30, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(0, 0, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+                return true;
+            }
+            return false;
+        });
     }
     
     startEruption() {
@@ -765,6 +868,23 @@ class VolcanoStructure {
             }
         }
         
+        // Lava flows - flussi di lava che scendono lungo i lati del vulcano
+        if (this.eruptionPhase === 'main' || this.eruptionPhase === 'explosive') {
+            for (let i = 0; i < intensity * 3; i++) {
+                this.lavaFlows.push({
+                    x: this.crater.x + (Math.random() - 0.5) * this.crater.radius * 2,
+                    y: this.crater.y + 10,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: Math.random() * 2 + 1,
+                    width: Math.random() * 30 + 15,
+                    height: Math.random() * 20 + 10,
+                    life: 1,
+                    temperature: 1100 + Math.random() * 200,
+                    type: 'lavaflow'
+                });
+            }
+        }
+        
         // Lightning bolts during explosive phase
         if (this.eruptionPhase === 'explosive' && Math.random() < 0.1) {
             this.lightningBolts.push({
@@ -814,6 +934,18 @@ class VolcanoStructure {
         this.lightningBolts = this.lightningBolts.filter(bolt => {
             bolt.life -= 3 * dt;
             return bolt.life > 0;
+        });
+        
+        // Update lava flows
+        this.lavaFlows = this.lavaFlows.filter(flow => {
+            flow.x += flow.vx * dt;
+            flow.y += flow.vy * dt;
+            flow.vy += 3 * dt; // gravità per scorrimento verso il basso
+            flow.vx *= 0.99; // attrito
+            flow.life -= 0.3 * dt; // durata più lunga per flussi persistenti
+            flow.temperature -= 20 * dt; // raffreddamento lento
+            flow.width += 0.5 * dt; // si allarga mentre scorre
+            return flow.life > 0 && flow.y < GAME_CONFIG.world.totalHeight;
         });
     }
     
@@ -888,6 +1020,28 @@ class VolcanoStructure {
             ctx.restore();
         });
         
+        // Draw lava flows - flussi di lava che scendono dal cratere
+        this.lavaFlows.forEach(flow => {
+            ctx.save();
+            ctx.globalAlpha = flow.life;
+            
+            // Gradiente per flusso di lava
+            const flowGradient = ctx.createLinearGradient(flow.x - flow.width/2, flow.y, flow.x + flow.width/2, flow.y);
+            flowGradient.addColorStop(0, 'rgba(139, 0, 0, 0.5)');
+            flowGradient.addColorStop(0.5, '#FF4500');
+            flowGradient.addColorStop(1, 'rgba(139, 0, 0, 0.5)');
+            
+            ctx.fillStyle = flowGradient;
+            ctx.shadowColor = '#FF4500';
+            ctx.shadowBlur = 10;
+            
+            // Disegna il flusso con forma organica
+            ctx.beginPath();
+            ctx.ellipse(flow.x, flow.y, flow.width/2, flow.height/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+        
         ctx.restore();
     }
     
@@ -904,6 +1058,94 @@ class VolcanoStructure {
         const dy = magma.y - this.crater.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         return distance < this.crater.radius + magma.radius;
+    }
+}
+
+// Resistant Rock Obstacle Class - "ROCCIA RESISTENTE" (molto più resistente)
+class ResistantRock {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = Math.random() * (GAME_CONFIG.resistantRocks.maxSize - GAME_CONFIG.resistantRocks.minSize) + GAME_CONFIG.resistantRocks.minSize;
+        this.height = Math.random() * 30 + 20;
+        this.color = GAME_CONFIG.resistantRocks.color;
+        this.name = "ROCCIA RESISTENTE"; // Nome italiano dell'oggetto
+        this.blockage = GAME_CONFIG.resistantRocks.blockageStrength;
+        this.cracks = []; // Crepe dalla pressione del magma
+        this.integrity = 1.0; // Integrità della roccia
+    }
+    
+    draw(ctx) {
+        // Safety check for valid coordinates and dimensions
+        if (!isFinite(this.x) || !isFinite(this.y) || !isFinite(this.width) || !isFinite(this.height)) {
+            return;
+        }
+        
+        ctx.save();
+        
+        // Roccia nera principale con texture
+        const gradient = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
+        gradient.addColorStop(0, '#2C2C2C');   // Grigio scuro
+        gradient.addColorStop(0.3, '#1C1C1C'); // Nero
+        gradient.addColorStop(0.7, '#0C0C0C'); // Nero profondo
+        gradient.addColorStop(1, '#000000');   // Nero assoluto
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        
+        // Bordo più scuro per enfatizzare resistenza
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        
+        // Texture di resistenza - cristalli scuri
+        ctx.fillStyle = '#444444';
+        for (let i = 0; i < 8; i++) {
+            const crystalX = this.x + Math.random() * this.width;
+            const crystalY = this.y + Math.random() * this.height;
+            const crystalSize = Math.random() * 3 + 1;
+            ctx.beginPath();
+            ctx.arc(crystalX, crystalY, crystalSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Mostra crepe se la roccia è danneggiata
+        if (this.integrity < 1.0) {
+            ctx.strokeStyle = `rgba(139, 69, 19, ${1 - this.integrity})`;
+            ctx.lineWidth = 1;
+            this.cracks.forEach(crack => {
+                ctx.beginPath();
+                ctx.moveTo(crack.x1, crack.y1);
+                ctx.lineTo(crack.x2, crack.y2);
+                ctx.stroke();
+            });
+        }
+        
+        ctx.restore();
+    }
+    
+    checkCollision(magma) {
+        return magma.x + magma.radius > this.x &&
+               magma.x - magma.radius < this.x + this.width &&
+               magma.y + magma.radius > this.y &&
+               magma.y - magma.radius < this.y + this.height;
+    }
+    
+    // Metodo per applicare pressione del magma
+    applyMagmaPressure(pressure) {
+        this.integrity -= pressure * 0.001; // Lenta erosione
+        
+        // Aggiungi crepe casuali quando danneggiata
+        if (this.integrity < 0.8 && Math.random() < 0.1) {
+            this.cracks.push({
+                x1: this.x + Math.random() * this.width,
+                y1: this.y + Math.random() * this.height,
+                x2: this.x + Math.random() * this.width,
+                y2: this.y + Math.random() * this.height
+            });
+        }
+        
+        return this.integrity > 0; // Ritorna false se distrutta
     }
 }
 
@@ -952,12 +1194,41 @@ class MagmaPlayer {
         this.trail = [];
         this.lastSpaceBoost = 0;
         
+        // Proprietà per deformazioni dinamiche
+        this.collisionDeformation = 1.0; // Fattore di deformazione da collisioni
+        this.deformationDecay = 0.05; // Velocità di ritorno alla forma normale
+        this.lastCollisionTime = 0;
+        this.impactDirection = { x: 0, y: 0 }; // Direzione dell'ultimo impatto
+        
         // Fluid dynamics properties
         this.density = 2.5;
         this.mass = Math.PI * this.radius * this.radius * this.density;
+        
+        // Proprietà per gestione rocce resistenti
+        this.nearResistantRock = false;
+        this.blockedByResistantRock = false;
     }
     
     update(controls, dt) {
+        // Gestione boost di velocità da faglia geologica
+        if (this.faultSpeedBoost && this.faultSpeedBoost.active) {
+            const elapsed = Date.now() - this.faultSpeedBoost.startTime;
+            if (elapsed >= this.faultSpeedBoost.duration) {
+                this.faultSpeedBoost.active = false;
+            }
+        }
+        
+        // Gestione trasformazione di forma da faglia geologica
+        if (this.faultShapeTransform && this.faultShapeTransform.active) {
+            const elapsed = Date.now() - this.faultShapeTransform.startTime;
+            if (elapsed >= this.faultShapeTransform.duration) {
+                this.faultShapeTransform.active = false;
+            } else {
+                // Decadimento graduale dell'intensità
+                this.faultShapeTransform.intensity = 1.0 - (elapsed / this.faultShapeTransform.duration);
+            }
+        }
+        
         // Get current layer properties
         const layerProps = this.getLayerProperties();
         
@@ -973,11 +1244,20 @@ class MagmaPlayer {
         }
         
         // Apply horizontal controls (left/right arrows)
+        // Boost extra quando si è vicini a rocce resistenti
+        let horizontalBoost = 1.0;
+        if (this.nearResistantRock) {
+            horizontalBoost = 2.5; // Boost 2.5x per aggirare ostacoli
+        }
+        if (this.blockedByResistantRock) {
+            horizontalBoost = 4.0; // Boost 4x quando completamente bloccato
+        }
+        
         if (controls.left) {
-            this.vx -= GAME_CONFIG.controls.horizontalForce * dt;
+            this.vx -= GAME_CONFIG.controls.horizontalForce * dt * horizontalBoost;
         }
         if (controls.right) {
-            this.vx += GAME_CONFIG.controls.horizontalForce * dt;
+            this.vx += GAME_CONFIG.controls.horizontalForce * dt * horizontalBoost;
         }
         
         // Apply space boost (with cooldown)
@@ -989,25 +1269,44 @@ class MagmaPlayer {
             this.createBoostParticles();
         }
         
-        // Natural buoyancy (magma wants to rise)
-        const buoyancy = this.composition.getBuoyancy();
-        this.vy -= buoyancy * dt * 10.0; // Aumentato da 3.0 a 10.0 per azione esplosiva
-        
-        // Pressure gradient force (lower pressure above)
-        const pressureGradient = (layerProps.pressure - 0.3) * 1.0; // Aumentato da 0.3 a 1.0
-        this.vy -= pressureGradient * dt;
-        
-        // Apply viscosity (resistance to flow) - ulteriormente ridotto
-        const viscosity = this.composition.getViscosity() * layerProps.viscosity;
-        this.vx *= Math.max(0.98, 1 - viscosity * 0.01 * dt); // Quasi nessuna resistenza
-        this.vy *= Math.max(0.99, 1 - viscosity * 0.005 * dt); // Quasi nessuna resistenza
-        
-        // Apply density effects
-        const densityEffect = layerProps.density / this.density;
-        this.vy += (densityEffect - 1) * 0.5 * dt; // Aumentato da 0.15 a 0.5
+        // Salta tutte le forze automatiche se bloccato da roccia resistente
+        if (!this.blockedByResistantRock) {
+            // Natural buoyancy (magma wants to rise)
+            const buoyancy = this.composition.getBuoyancy();
+            this.vy -= buoyancy * dt * 10.0; // Aumentato da 3.0 a 10.0 per azione esplosiva
+            
+            // Pressure gradient force (lower pressure above)
+            const pressureGradient = (layerProps.pressure - 0.3) * 1.0; // Aumentato da 0.3 a 1.0
+            this.vy -= pressureGradient * dt;
+            
+            // Apply viscosity (resistance to flow) with enhanced dampening
+            const viscosity = this.composition.getViscosity() * layerProps.viscosity;
+            
+            // Improved viscosity dampening with more realistic physics
+            this.vx -= this.vx * viscosity * dt * 0.05;
+            this.vy -= this.vy * viscosity * dt * 0.03;
+            
+            // Additional legacy dampening for ultra-smooth movement
+            this.vx *= Math.max(0.98, 1 - viscosity * 0.01 * dt);
+            this.vy *= Math.max(0.99, 1 - viscosity * 0.005 * dt);
+            
+            // Add organic noise for more natural movement
+            let noise = Math.sin(Date.now() * 0.001) * 0.5;
+            this.vx += noise * 0.1 * dt;
+            
+            // Apply density effects
+            const densityEffect = layerProps.density / this.density;
+            this.vy += (densityEffect - 1) * 0.5 * dt; // Aumentato da 0.15 a 0.5
+        }
         
         // Speed limits based on composition
-        const maxSpeed = GAME_CONFIG.magma.maxSpeed / Math.max(0.5, this.composition.getViscosity());
+        let maxSpeed = GAME_CONFIG.magma.maxSpeed / Math.max(0.5, this.composition.getViscosity());
+        
+        // Applica boost di velocità da faglia geologica
+        if (this.faultSpeedBoost && this.faultSpeedBoost.active) {
+            maxSpeed *= this.faultSpeedBoost.multiplier;
+        }
+        
         const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         
         if (speed > maxSpeed) {
@@ -1020,10 +1319,50 @@ class MagmaPlayer {
         this.y += this.vy * dt;
         
         // Keep in horizontal bounds (world wrapping could be added)
+        const prevX = this.x;
         this.x = Math.max(this.radius, Math.min(GAME_CONFIG.canvas.width - this.radius, this.x));
+        
+        // Deformazione da collisione con i bordi
+        if (prevX !== this.x) {
+            const impactForce = Math.abs(this.vx) / GAME_CONFIG.magma.maxSpeed;
+            const dirX = this.x < GAME_CONFIG.canvas.width / 2 ? 1 : -1;
+            this.applyCollisionDeformation(impactForce, dirX, 0);
+        }
         
         // Update trail
         this.updateTrail();
+        
+        // Update collision deformation
+        this.updateCollisionDeformation(dt);
+    }
+    
+    // Metodo per gestire deformazioni da collisione
+    updateCollisionDeformation(dt) {
+        // Decadimento graduale della deformazione verso il normale
+        if (this.collisionDeformation > 1.0) {
+            this.collisionDeformation -= this.deformationDecay * dt;
+            this.collisionDeformation = Math.max(1.0, this.collisionDeformation);
+        } else if (this.collisionDeformation < 1.0) {
+            this.collisionDeformation += this.deformationDecay * dt;
+            this.collisionDeformation = Math.min(1.0, this.collisionDeformation);
+        }
+        
+        // Decadimento della direzione di impatto
+        this.impactDirection.x *= 0.95;
+        this.impactDirection.y *= 0.95;
+    }
+    
+    // Metodo per applicare deformazione da collisione (ridotta per smoothness)
+    applyCollisionDeformation(impactForce, directionX, directionY) {
+        // Intensità della deformazione ridotta per evitare spigoli
+        const deformationIntensity = Math.min(1.5, 1.0 + impactForce * 0.3); // Ridotto da 2.0 e 0.5
+        this.collisionDeformation = deformationIntensity;
+        
+        // Memorizza direzione dell'impatto per deformazione direzionale
+        this.impactDirection.x = directionX * 0.5; // Ridotto l'effetto
+        this.impactDirection.y = directionY * 0.5;
+        
+        this.lastCollisionTime = Date.now();
     }
     
     createBoostParticles() {
@@ -1036,213 +1375,485 @@ class MagmaPlayer {
     }
     
     updateTrail() {
+        // Aggiungi nuovo segmento della coda con proprietà estese
         this.trail.push({
             x: this.x,
             y: this.y,
-            life: 1,
+            radius: this.radius,
+            life: 1.0,
             temperature: this.composition.temperature,
-            viscosity: this.composition.getViscosity()
+            viscosity: this.composition.getViscosity(),
+            vx: this.vx, // Velocità per calcolare deformazione
+            vy: this.vy,
+            deformation: 1.0, // Fattore di deformazione iniziale
+            age: 0 // Età del segmento per effetti temporali
         });
         
-        if (this.trail.length > 20) {
+        // Mantieni una coda molto più lunga (aumentato da 50 a 150)
+        if (this.trail.length > 150) {
             this.trail.shift();
         }
         
-        // Fade trail based on cooling
-        this.trail.forEach(point => {
-            point.life -= 0.05;
-            point.temperature -= 2; // Cooling over time
-        });
-        this.trail = this.trail.filter(point => point.life > 0);
+        // Aggiorna ogni segmento della coda
+        for (let i = 0; i < this.trail.length; i++) {
+            let p = this.trail[i];
+            
+            // Incrementa età
+            p.age += 0.016; // ~60fps
+            
+            // Decadimento vita più lento per coda più lunga
+            p.life -= 0.008; // Ridotto da 0.02 a 0.008
+            p.temperature -= 1; // Raffreddamento più lento
+            
+            // Calcola deformazione basata su movimento e posizione nella coda
+            const speedMagnitude = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            const maxSpeed = GAME_CONFIG.magma.maxSpeed;
+            const speedRatio = Math.min(speedMagnitude / maxSpeed, 1);
+            
+            // Posizione relativa nella coda (0 = più vecchio, 1 = più nuovo)
+            const positionRatio = i / this.trail.length;
+            
+            // Deformazione basata su velocità, viscosità e posizione
+            const viscosityFactor = 1 / Math.max(0.1, p.viscosity);
+            const movementDeformation = 1 + (speedRatio * 0.4 * viscosityFactor);
+            const trailDeformation = 0.6 + (positionRatio * 0.4); // La coda si assottiglia
+            
+            // Oscillazioni organiche nella coda
+            const wavePhase = p.age * 2 + i * 0.3;
+            const organicWobble = 1 + Math.sin(wavePhase) * 0.15 * (1 - positionRatio);
+            
+            p.deformation = movementDeformation * trailDeformation * organicWobble;
+            
+            // Aggiorna velocità del segmento (inerzia della coda)
+            if (i > 0) {
+                const prev = this.trail[i - 1];
+                const dampening = 0.95; // Smorzamento per effetto trascinamento
+                p.vx = p.vx * dampening + prev.vx * (1 - dampening);
+                p.vy = p.vy * dampening + prev.vy * (1 - dampening);
+            }
+        }
+        
+        // Rimuovi segmenti morti
+        this.trail = this.trail.filter(p => p.life > 0);
     }
     
+    drawOval(ctx, x, y, radiusX, radiusY) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
     draw(ctx) {
         const layerProps = this.getLayerProperties();
         
-        // Draw trail with temperature-based colors
-        this.trail.forEach((point, index) => {
+        // Draw enhanced trail with deformation and movement response
+        for (let i = 0; i < this.trail.length; i++) {
+            const p = this.trail[i];
             ctx.save();
-            ctx.globalAlpha = point.life * 0.6;
             
-            // Color based on temperature
-            let trailColor = '#8B0000'; // Dark red for cool
-            if (point.temperature > 800) trailColor = '#FF4500'; // Orange for hot
-            if (point.temperature > 1000) trailColor = '#FFD700'; // Gold for very hot
+            // Enhanced color based on life, temperature and position
+            const alpha = p.life * 0.8;
+            const redIntensity = Math.min(255, 100 + p.temperature * 0.15);
+            const greenIntensity = Math.floor(100 * p.life);
             
-            ctx.fillStyle = trailColor;
-            const size = (this.radius * 0.7) * point.life * (1 / Math.max(0.5, point.viscosity));
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        });
+            // Gradiente di colore lungo la coda
+            const positionRatio = i / this.trail.length;
+            const heatAdjustment = 1 - (positionRatio * 0.3); // La coda si raffredda
+            
+            ctx.fillStyle = `rgba(${Math.floor(redIntensity * heatAdjustment)}, ${Math.floor(greenIntensity * heatAdjustment)}, 0, ${alpha})`;
+            
+            // Calcola dimensione con deformazione avanzata
+            const baseSize = p.radius * p.life * p.deformation;
+            
+            // Deformazione direzionale basata sulla velocità
+            const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            if (speed > 0.5) {
+                // Allungamento nella direzione del movimento
+                const angle = Math.atan2(p.vy, p.vx);
+                const stretchFactor = 1 + (speed / GAME_CONFIG.magma.maxSpeed) * 0.6;
+                const compressFactor = 1 / Math.sqrt(stretchFactor);
+                
+                ctx.translate(p.x, p.y);
+                ctx.rotate(angle);
+                
+                // Forma ellittica deformata
+                ctx.beginPath();
+                ctx.ellipse(0, 0, baseSize * stretchFactor, baseSize * compressFactor, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            } else {
+                // Forma circolare per movimenti lenti
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, baseSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
         
         // Calculate speed and movement direction for fluid dynamics
         const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         const maxSpeed = GAME_CONFIG.magma.maxSpeed;
         const speedRatio = Math.min(speed / maxSpeed, 1);
         
-        // Calculate fluid deformation based on velocity and viscosity
+        // Calculate fluid deformation based on velocity, viscosity, and geological depth
         const viscosity = this.composition.getViscosity();
         const fluidResistance = Math.max(0.1, Math.min(1, viscosity));
         
-        // Deformation factors for lava lamp effect
-        const stretchFactor = 1 + (speedRatio * 1.5 * (1 - fluidResistance)); // More speed = more stretch
-        const compressFactor = 1 - (speedRatio * 0.3 * (1 - fluidResistance)); // Compression perpendicular to movement
+        // Get geological layer-based deformation factors (declare once here)
+        const depthFactor = this.getDepthDeformationFactor();
+        const temperatureFactor = Math.min(1.5, this.composition.temperature / 800); // Higher temp = more fluid
+        
+        // Enhanced deformation factors that change with depth, temperature and collisions
+        const baseStretch = 1.5 + (depthFactor * 2.0); // More deformation in deeper layers
+        const baseCompress = 0.3 + (depthFactor * 0.4); // More compression when fluid
+        
+        // Fattori di deformazione da collisione
+        const collisionStretch = this.collisionDeformation;
+        const impactAngle = Math.atan2(this.impactDirection.y, this.impactDirection.x);
+        
+        const stretchFactor = (1 + (speedRatio * baseStretch * (1 - fluidResistance) * temperatureFactor)) * collisionStretch;
+        const compressFactor = 1 - (speedRatio * baseCompress * (1 - fluidResistance) * temperatureFactor);
         
         // Movement angle for directional deformation
         const moveAngle = Math.atan2(this.vy, this.vx);
         
+        // Time-based variables for lava lamp animation with depth-dependent frequency (molto più lento)
+        const baseFrequency = 0.0008 + (depthFactor * 0.001); // Ridotto drasticamente da 0.003-0.004
+        const time = Date.now() * baseFrequency;
+        const slowTime = Date.now() * (baseFrequency * 0.2); // Ancora più lento
+        
+        // Wobble intensity based on geological layer (molto più ampio e lento)
+        const wobbleIntensity = 0.3 + (depthFactor * 0.4); // Ridotto ulteriormente per movimenti ampi
+        
+        // Apply organic squish effect using your enhanced code (super lento e ampio)
+        let squish = 1 + Math.sin(Date.now() * 0.001) * 0.2; // Molto più lento e ampio
+        
         ctx.save();
         
-        // Glow intensity based on temperature
-        const glowIntensity = Math.min(50, this.composition.temperature / 20);
+        // Enhanced glow intensity based on temperature with pulsing effect
+        const glowIntensity = Math.min(60, this.composition.temperature / 15);
+        const glowPulse = 1 + Math.sin(time * 2) * 0.3; // Pulsing glow
         ctx.shadowColor = this.getTemperatureColor();
-        ctx.shadowBlur = glowIntensity;
+        ctx.shadowBlur = glowIntensity * glowPulse;
         
         // Move to magma center for transformation
         ctx.translate(this.x, this.y);
         
-        // Apply rotation based on movement direction
+        // Apply rotation based on movement direction for flowing effect
         if (speed > 1) {
-            ctx.rotate(moveAngle);
+            ctx.rotate(moveAngle + Math.sin(time) * 0.1); // Slight rotation wobble
         }
         
-        // Create complex gradient for lava lamp effect
+        // Create complex gradient for enhanced lava lamp effect
         const gradientRadius = this.radius * stretchFactor;
         const gradient = ctx.createRadialGradient(
-            -gradientRadius * 0.3, -gradientRadius * 0.2, 0, // Inner light spot (offset)
-            0, 0, gradientRadius
+            -gradientRadius * 0.3 + Math.sin(time * 1.5) * gradientRadius * 0.1, // Moving light spot
+            -gradientRadius * 0.2 + Math.cos(time * 1.2) * gradientRadius * 0.1, 
+            0,
+            0, 0, gradientRadius * 1.2 // Larger gradient for softer edges
         );
         
-        // Multi-layered gradient for realistic lava look
+        // Multi-layered gradient for realistic lava look with smoother transitions
         const tempColor = this.getTemperatureColor();
         const baseTemp = this.composition.temperature;
         
         if (baseTemp > 1000) {
-            // Very hot - bright core
+            // Very hot - bright core with dynamic inner light
             gradient.addColorStop(0, '#FFFFFF');      // White hot center
-            gradient.addColorStop(0.2, '#FFFF99');    // Bright yellow
-            gradient.addColorStop(0.4, '#FFD700');    // Gold
-            gradient.addColorStop(0.7, '#FF8C00');    // Orange
-            gradient.addColorStop(0.9, '#FF4500');    // Red
+            gradient.addColorStop(0.15, '#FFFF99');   // Bright yellow
+            gradient.addColorStop(0.3, '#FFD700');    // Gold
+            gradient.addColorStop(0.5, '#FF8C00');    // Orange
+            gradient.addColorStop(0.7, '#FF4500');    // Red
+            gradient.addColorStop(0.85, '#DC143C');   // Crimson
             gradient.addColorStop(1, '#8B0000');      // Dark red edge
         } else if (baseTemp > 800) {
-            // Hot - golden core
+            // Hot - golden core with smooth transitions
             gradient.addColorStop(0, '#FFD700');      // Gold center
-            gradient.addColorStop(0.3, '#FF8C00');    // Orange
+            gradient.addColorStop(0.2, '#FFA500');    // Orange
+            gradient.addColorStop(0.4, '#FF8C00');    // Dark orange
             gradient.addColorStop(0.6, '#FF4500');    // Red-orange
             gradient.addColorStop(0.8, '#DC143C');    // Crimson
             gradient.addColorStop(1, '#8B0000');      // Dark red edge
         } else {
-            // Cooler - red core
+            // Cooler - red core with subtle variations
             gradient.addColorStop(0, '#FF6347');      // Tomato center
-            gradient.addColorStop(0.4, '#FF4500');    // Orange-red
-            gradient.addColorStop(0.7, '#DC143C');    // Crimson
-            gradient.addColorStop(0.9, '#8B0000');    // Dark red
+            gradient.addColorStop(0.3, '#FF4500');    // Orange-red
+            gradient.addColorStop(0.6, '#DC143C');    // Crimson
+            gradient.addColorStop(0.8, '#8B0000');    // Dark red
             gradient.addColorStop(1, '#4B0000');      // Very dark edge
         }
         
-        // Draw fluid blob with dynamic shape
+        // Draw enhanced fluid blob with lava lamp organic shape
         ctx.fillStyle = gradient;
         ctx.beginPath();
         
-        // Create organic, fluid shape using multiple control points
-        const points = 16; // Number of points for smooth curve
+        // Create highly organic, lava lamp shape using more control points for ultra-smooth curves
+        const points = 32; // Aumentato da 24 a 32 per curves più fluide
         const angleStep = (Math.PI * 2) / points;
+        
+        // Multiple wave frequencies for complex organic shape - molto più lente
+        const wave1Freq = 2 + (depthFactor * 1); // Ridotto drasticamente per onde lente
+        const wave2Freq = 3 + (depthFactor * 1.5); // Molto più lento
+        const wave3Freq = 4 + (depthFactor * 2); // Più lento
         
         for (let i = 0; i <= points; i++) {
             const angle = i * angleStep;
             
-            // Calculate radius with organic variation
+            // Calculate radius with complex organic variation
             let radiusVariation = this.radius;
             
             // Apply stretching in movement direction
             if (Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))) {
-                // Horizontal stretching
+                // Horizontal stretching based on movement
                 radiusVariation *= stretchFactor;
             } else {
                 // Vertical compression
                 radiusVariation *= compressFactor;
             }
             
-            // Add organic wobble based on viscosity and time
-            const wobbleTime = Date.now() * 0.003;
-            const wobbleAmount = (1 - fluidResistance) * 0.1 * this.radius;
-            const wobble = Math.sin(angle * 3 + wobbleTime) * wobbleAmount;
-            radiusVariation += wobble;
+            // Multiple layers of organic wobble for lava lamp effect - super lente e ampie
+            const primaryWobble = Math.sin(angle * wave1Freq + time) * 0.25 * wobbleIntensity; // Aumentato per ampiezza
+            const secondaryWobble = Math.sin(angle * wave2Freq + slowTime * 2) * 0.15 * wobbleIntensity; // Più ampio
+            const tertiaryWobble = Math.sin(angle * wave3Freq - time * 1.5) * 0.08 * wobbleIntensity; // Più ampio
             
-            // Add surface tension effect
-            const tensionEffect = 1 + Math.sin(angle * 4) * 0.05 * (1 - speedRatio);
+            const totalWobble = (primaryWobble + secondaryWobble + tertiaryWobble) * this.radius * (1 - fluidResistance);
+            radiusVariation += totalWobble;
+            
+            // Smoothing filter per evitare cambi bruschi
+            const targetRadius = radiusVariation;
+            if (i > 0) {
+                const prevAngleTarget = ((i - 1) / points) * Math.PI * 2;
+                const prevRadius = this.radius + (Math.sin(prevAngleTarget * wave1Freq + time) * 0.08 * wobbleIntensity * this.radius * (1 - fluidResistance));
+                radiusVariation = radiusVariation * 0.8 + prevRadius * 0.2; // Smoothing blend
+            }
+            
+            // Add surface tension effect with temperature and depth influence
+            const tensionPhase = angle * 4 + time * 0.5;
+            const tensionEffect = 1 + Math.sin(tensionPhase) * 0.08 * (1 - speedRatio) * temperatureFactor * (1 + depthFactor);
             radiusVariation *= tensionEffect;
             
-            const x = Math.cos(angle) * radiusVariation;
-            const y = Math.sin(angle) * radiusVariation;
+            // Add buoyancy bulges (magma rises in blobs) - more pronounced in mantle
+            if (this.vy < 0) { // Rising
+                const buoyancyEffect = Math.sin(angle * 2 + time * 2) * 0.1 * Math.abs(this.vy) / 10 * (1 + depthFactor);
+                radiusVariation += buoyancyEffect * this.radius;
+            }
+            
+            // Aggiungi deformazione da collisione (ridotta per smoothness)
+            if (this.collisionDeformation > 1.0) {
+                // Deformazione direzionale basata sull'impatto - ridotta
+                const impactInfluence = Math.cos(angle - impactAngle) * 0.15; // Ridotto da 0.3
+                const collisionEffect = (this.collisionDeformation - 1.0) * impactInfluence;
+                radiusVariation *= (1 + collisionEffect);
+            }
+            
+            // Trasformazione di forma da faglia geologica
+            if (this.faultShapeTransform && this.faultShapeTransform.active) {
+                // Crea forma allungata nella direzione della faglia
+                const faultAngle = this.faultShapeTransform.angle;
+                const intensity = this.faultShapeTransform.intensity;
+                
+                // Allunga nella direzione della faglia, comprimi perpendicolarmente
+                const angleDiff = Math.abs(((angle - faultAngle) % (Math.PI * 2)) - Math.PI);
+                const isParallelToFault = angleDiff < Math.PI / 4 || angleDiff > (3 * Math.PI / 4);
+                
+                if (isParallelToFault) {
+                    // Allunga lungo la faglia
+                    radiusVariation *= (1 + intensity * 0.6);
+                } else {
+                    // Comprimi perpendicolarmente alla faglia
+                    radiusVariation *= (1 - intensity * 0.3);
+                }
+            }
+            
+            // Calculate position with organic flowing curves and squish effect
+            const x = Math.cos(angle) * radiusVariation * squish;
+            const y = Math.sin(angle) * radiusVariation / squish;
             
             if (i === 0) {
                 ctx.moveTo(x, y);
+            } else if (i === points) {
+                // Close the path smoothly back to the start with improved curve
+                const firstAngle = 0;
+                const firstRadiusVar = this.radius;
+                const firstX = Math.cos(firstAngle) * firstRadiusVar * squish;
+                const firstY = Math.sin(firstAngle) * firstRadiusVar / squish;
+                
+                ctx.lineTo(firstX, firstY);
             } else {
-                // Use smooth curves for organic flow
-                const prevAngle = (i - 1) * angleStep;
-                const nextAngle = (i + 1) * angleStep;
-                
-                const controlDistance = radiusVariation * 0.2;
-                const cpx = x - Math.cos(angle + Math.PI / 2) * controlDistance;
-                const cpy = y - Math.sin(angle + Math.PI / 2) * controlDistance;
-                
-                ctx.quadraticCurveTo(cpx, cpy, x, y);
+                // Use simple lineTo for perfect smoothness
+                ctx.lineTo(x, y);
             }
         }
         
         ctx.closePath();
         ctx.fill();
         
-        // Add inner highlights for more realism
+        // Add multiple inner highlights for enhanced lava lamp realism
         if (baseTemp > 800) {
+            // Primary highlight with flowing movement
             const highlightGradient = ctx.createRadialGradient(
-                -this.radius * 0.4, -this.radius * 0.3, 0,
-                0, 0, this.radius * 0.7
+                -this.radius * 0.4 + Math.sin(time * 1.8) * this.radius * 0.2,
+                -this.radius * 0.3 + Math.cos(time * 1.3) * this.radius * 0.15,
+                0,
+                0, 0, this.radius * 0.8
             );
-            highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
-            highlightGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+            highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            highlightGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.4)');
+            highlightGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.1)');
             highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
             ctx.fillStyle = highlightGradient;
             ctx.beginPath();
             ctx.ellipse(0, 0, this.radius * 0.6 * stretchFactor, this.radius * 0.6 * compressFactor, 0, 0, Math.PI * 2);
             ctx.fill();
+            
+            // Secondary highlight for depth
+            const secondaryHighlight = ctx.createRadialGradient(
+                this.radius * 0.2 + Math.cos(time * 2.2) * this.radius * 0.1,
+                this.radius * 0.3 + Math.sin(time * 1.7) * this.radius * 0.1,
+                0,
+                0, 0, this.radius * 0.5
+            );
+            secondaryHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+            secondaryHighlight.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+            secondaryHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = secondaryHighlight;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.radius * 0.3, this.radius * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
         }
         
-        // Draw gas bubbles if high gas content
+        // Enhanced gas bubbles with lava lamp style animation
         if (this.composition.gas > 0.05) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-            const bubbleCount = Math.floor(this.composition.gas * 15);
+            const bubbleCount = Math.floor(this.composition.gas * 20);
             for (let i = 0; i < bubbleCount; i++) {
-                const bubbleAngle = (i / bubbleCount) * Math.PI * 2;
-                const bubbleDistance = Math.random() * this.radius * 0.7;
-                const bubbleX = Math.cos(bubbleAngle) * bubbleDistance;
-                const bubbleY = Math.sin(bubbleAngle) * bubbleDistance;
-                const bubbleSize = Math.random() * 3 + 1;
+                // Animated bubble positions
+                const bubbleTime = time + i * 0.5;
+                const bubbleAngle = (i / bubbleCount) * Math.PI * 2 + bubbleTime * 0.3;
+                const bubbleDistance = (0.3 + Math.sin(bubbleTime * 1.5) * 0.2) * this.radius;
                 
+                // Bubble movement like in lava lamp
+                const bubbleX = Math.cos(bubbleAngle) * bubbleDistance + Math.sin(bubbleTime * 2) * this.radius * 0.1;
+                const bubbleY = Math.sin(bubbleAngle) * bubbleDistance + Math.cos(bubbleTime * 1.8) * this.radius * 0.1;
+                const bubbleSize = (2 + Math.sin(bubbleTime * 3) * 1) * (1 + this.composition.gas);
+                
+                // Bubble gradient for 3D effect
+                const bubbleGradient = ctx.createRadialGradient(
+                    bubbleX - bubbleSize * 0.3, bubbleY - bubbleSize * 0.3, 0,
+                    bubbleX, bubbleY, bubbleSize
+                );
+                bubbleGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                bubbleGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.4)');
+                bubbleGradient.addColorStop(1, 'rgba(255, 255, 255, 0.1)');
+                
+                ctx.fillStyle = bubbleGradient;
                 ctx.beginPath();
                 ctx.arc(bubbleX, bubbleY, bubbleSize, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
         
-        // Add viscosity indicator (surface ripples for low viscosity)
-        if (viscosity < 0.5) {
-            ctx.strokeStyle = `rgba(255, 200, 100, ${0.3 * (1 - viscosity)})`;
-            ctx.lineWidth = 1;
-            for (let i = 0; i < 3; i++) {
-                const rippleRadius = this.radius * (0.7 + i * 0.15);
+        // Add enhanced viscosity indicator with subtle lava lamp flow
+        if (viscosity < 0.5 && depthFactor > 0.3) { // Only show flow in deeper, more fluid layers
+            const flowOpacity = 0.15 * (1 - viscosity) * depthFactor; // Reduced opacity
+            ctx.strokeStyle = `rgba(255, 200, 100, ${flowOpacity})`;
+            ctx.lineWidth = 0.5 + (depthFactor * 0.3); // Thinner lines
+            
+            // Only show subtle inner flow patterns
+            const flowLines = 2 + Math.floor(depthFactor * 2);
+            for (let i = 0; i < flowLines; i++) {
+                const lineTime = time * (0.5 + i * 0.2 + depthFactor * 0.3); // Slower animation
+                const rippleRadius = this.radius * (0.7 + i * 0.1); // Smaller, inner circles
+                
                 ctx.beginPath();
-                ctx.arc(0, 0, rippleRadius * stretchFactor, 0, Math.PI * 2);
+                ctx.arc(0, 0, rippleRadius, 0, Math.PI * 2);
                 ctx.stroke();
             }
         }
         
+        // Add flowing energy streaks for very hot magma - more intense in deeper layers
+        if (baseTemp > 1000) {
+            const streakOpacity = 0.6 * Math.sin(time * 3) * (1 + depthFactor * 0.5);
+            ctx.strokeStyle = `rgba(255, 255, 0, ${Math.abs(streakOpacity)})`;
+            ctx.lineWidth = 2 + (depthFactor * 1);
+            
+            const streakCount = 3 + Math.floor(depthFactor * 2);
+            for (let i = 0; i < streakCount; i++) {
+                const streakAngle = (i / streakCount) * Math.PI * 2 + time * (1 + depthFactor);
+                const streakLength = this.radius * (1.5 + depthFactor);
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(
+                    Math.cos(streakAngle) * streakLength,
+                    Math.sin(streakAngle) * streakLength
+                );
+                ctx.stroke();
+            }
+        }
+        
+        // Add depth-specific particle effects
+        if (depthFactor > 0.7) { // Deep mantle effects
+            ctx.fillStyle = `rgba(255, 100, 0, ${0.3 * Math.sin(time * 4)})`;
+            for (let i = 0; i < 5; i++) {
+                const particleAngle = (i / 5) * Math.PI * 2 + time * 2;
+                const particleDistance = this.radius * (1.2 + Math.sin(time + i) * 0.3);
+                const particleX = Math.cos(particleAngle) * particleDistance;
+                const particleY = Math.sin(particleAngle) * particleDistance;
+                const particleSize = 2 + Math.sin(time * 3 + i) * 1;
+                
+                ctx.beginPath();
+                ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
         ctx.restore();
+        
+        // Indicatore di vicinanza a rocce resistenti
+        if (this.nearResistantRock || this.blockedByResistantRock) {
+            ctx.save();
+            
+            // Colore diverso se completamente bloccato
+            if (this.blockedByResistantRock) {
+                ctx.strokeStyle = '#FF0000'; // Rosso per blocco totale
+                ctx.lineWidth = 5;
+            } else {
+                ctx.strokeStyle = '#FFFF00'; // Giallo per vicinanza
+                ctx.lineWidth = 3;
+            }
+            
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius + 15, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Frecce di direzione per movimento laterale (più grandi se bloccato)
+            const arrowSize = this.blockedByResistantRock ? 12 : 8;
+            const arrowY = this.y - this.radius - 25;
+            
+            // Freccia sinistra
+            ctx.fillStyle = this.blockedByResistantRock ? '#FF0000' : '#FFFF00';
+            ctx.beginPath();
+            ctx.moveTo(this.x - 30, arrowY);
+            ctx.lineTo(this.x - 30 - arrowSize, arrowY - arrowSize/2);
+            ctx.lineTo(this.x - 30 - arrowSize, arrowY + arrowSize/2);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Freccia destra
+            ctx.beginPath();
+            ctx.moveTo(this.x + 30, arrowY);
+            ctx.lineTo(this.x + 30 + arrowSize, arrowY - arrowSize/2);
+            ctx.lineTo(this.x + 30 + arrowSize, arrowY + arrowSize/2);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+        }
         
         // Draw composition indicators (moved outside the main transform)
         this.drawCompositionIndicators(ctx);
@@ -1291,6 +1902,28 @@ class MagmaPlayer {
         }
     }
     
+    // Calculate deformation factor based on geological depth
+    getDepthDeformationFactor() {
+        // Returns 0 to 1 where 1 = maximum deformation (deep mantle), 0 = minimum (surface)
+        if (this.y > GAME_CONFIG.world.mantleStart) {
+            // Deep mantle: maximum fluidity and deformation
+            const mantleDepth = (this.y - GAME_CONFIG.world.mantleStart) / (GAME_CONFIG.world.totalHeight - GAME_CONFIG.world.mantleStart);
+            return 0.7 + (mantleDepth * 0.3); // 0.7 to 1.0
+        } else if (this.y > GAME_CONFIG.world.crustStart) {
+            // Mantle to crust transition: medium fluidity
+            const transitionDepth = (this.y - GAME_CONFIG.world.crustStart) / (GAME_CONFIG.world.mantleStart - GAME_CONFIG.world.crustStart);
+            return 0.4 + (transitionDepth * 0.3); // 0.4 to 0.7
+        } else if (this.y > GAME_CONFIG.world.surfaceStart) {
+            // Crust: lower fluidity
+            const crustDepth = (this.y - GAME_CONFIG.world.surfaceStart) / (GAME_CONFIG.world.crustStart - GAME_CONFIG.world.surfaceStart);
+            return 0.2 + (crustDepth * 0.2); // 0.2 to 0.4
+        } else {
+            // Surface: minimum fluidity, maximum viscosity
+            const surfaceDepth = this.y / GAME_CONFIG.world.surfaceStart;
+            return surfaceDepth * 0.2; // 0.0 to 0.2
+        }
+    }
+    
     getCurrentDepth() {
         return GAME_CONFIG.world.totalHeight - this.y;
     }
@@ -1306,6 +1939,18 @@ class MagmaPlayer {
     // Methods for power-ups and environmental effects
     addWaterContent(amount) {
         this.composition.addWater(amount);
+        
+        // Crescita del magma quando raccoglie acqua
+        let growthFactor = amount * 0.02; // Crescita proporzionale all'acqua raccolta
+        this.baseRadius += growthFactor;
+        
+        // Limita la crescita massima
+        if (this.baseRadius > 35) {
+            this.baseRadius = 35;
+        }
+        
+        // Aggiorna anche il raggio dei trail per mantenere proporzioni
+        this.updateTrailRadii();
     }
     
     addGasContent(amount) {
@@ -1318,6 +1963,16 @@ class MagmaPlayer {
     
     increasePressure(amount) {
         this.composition.increasePressure(amount);
+    }
+    
+    updateTrailRadii() {
+        // Aggiorna i raggi dei trail per mantenere proporzioni con la crescita
+        this.trail.forEach((segment, index) => {
+            if (segment) {
+                let fadeRatio = segment.life;
+                segment.radius = this.baseRadius * fadeRatio * 0.8;
+            }
+        });
     }
 }
 
@@ -1334,6 +1989,7 @@ class VolcanoGame {
         this.waterPockets = [];
         this.gasPockets = [];
         this.rocks = [];
+        this.resistantRocks = []; // Rocce nere resistenti
         this.faults = [];
         this.volcano = null;
         
@@ -1480,6 +2136,7 @@ class VolcanoGame {
     
     generateLevel() {
         this.rocks = [];
+        this.resistantRocks = []; // Reset rocce resistenti
         this.faults = [];
         this.waterPockets = [];
         this.gasPockets = [];
@@ -1494,6 +2151,22 @@ class VolcanoGame {
                 const x = Math.random() * (GAME_CONFIG.canvas.width - 100) + 50;
                 const rockY = y + Math.random() * 180;
                 this.rocks.push(new RockObstacle(x, rockY));
+            }
+        }
+        
+        // Generate resistant rocks (rocce nere) - più frequenti man mano che si sale
+        for (let y = 0; y < worldHeight; y += 150) {
+            // Densità crescente verso la superficie
+            const surfaceProgress = (worldHeight - y) / worldHeight; // 0 = fondo, 1 = superficie
+            const resistantRockChance = surfaceProgress * GAME_CONFIG.resistantRocks.density;
+            
+            if (Math.random() < resistantRockChance) {
+                const numResistantRocks = Math.floor(Math.random() * 3) + 1; // 1-3 rocce resistenti
+                for (let i = 0; i < numResistantRocks; i++) {
+                    const x = Math.random() * (GAME_CONFIG.canvas.width - 100) + 50;
+                    const rockY = y + Math.random() * 140;
+                    this.resistantRocks.push(new ResistantRock(x, rockY));
+                }
             }
         }
         
@@ -1678,6 +2351,20 @@ class VolcanoGame {
         // Check rock collisions (more realistic fluid dynamics)
         this.rocks.forEach(rock => {
             if (rock.checkCollision(this.magma)) {
+                // Calcola forza di impatto per deformazione
+                const impactSpeed = Math.sqrt(this.magma.vx * this.magma.vx + this.magma.vy * this.magma.vy);
+                const impactForce = impactSpeed / GAME_CONFIG.magma.maxSpeed;
+                
+                // Calcola direzione dell'impatto
+                const dx = this.magma.x - (rock.x + rock.width/2);
+                const dy = this.magma.y - (rock.y + rock.height/2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const dirX = distance > 0 ? dx / distance : 0;
+                const dirY = distance > 0 ? dy / distance : 0;
+                
+                // Applica deformazione da collisione
+                this.magma.applyCollisionDeformation(impactForce, dirX, dirY);
+                
                 // Rocks provide resistance but don't completely stop flow
                 const resistance = 0.3 * this.deltaTime;
                 this.magma.vx *= (1 - resistance);
@@ -1700,6 +2387,59 @@ class VolcanoGame {
                     }
                 }
             }
+        });
+        
+        // Check proximity to resistant rocks for enhanced controls
+        this.magma.nearResistantRock = false;
+        this.magma.blockedByResistantRock = false; // Reset blocco ogni frame
+        this.resistantRocks.forEach(rock => {
+            const dx = this.magma.x - (rock.x + rock.width/2);
+            const dy = this.magma.y - (rock.y + rock.height/2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const proximityDistance = 80; // Distanza di rilevamento vicinanza
+            
+            if (distance < proximityDistance) {
+                this.magma.nearResistantRock = true;
+            }
+        });
+        
+        // Check resistant rock collisions (molto più resistenti)
+        this.resistantRocks = this.resistantRocks.filter(rock => {
+            if (rock.checkCollision(this.magma)) {
+                // Calcola forza di impatto
+                const impactSpeed = Math.sqrt(this.magma.vx * this.magma.vx + this.magma.vy * this.magma.vy);
+                const impactForce = impactSpeed / GAME_CONFIG.magma.maxSpeed;
+                
+                // Calcola direzione dell'impatto
+                const dx = this.magma.x - (rock.x + rock.width/2);
+                const dy = this.magma.y - (rock.y + rock.height/2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const dirX = distance > 0 ? dx / distance : 0;
+                const dirY = distance > 0 ? dy / distance : 0;
+                
+                // Applica deformazione da collisione molto forte
+                this.magma.applyCollisionDeformation(impactForce * 2, dirX, dirY);
+                
+                // STOP COMPLETO: ferma tutto il movimento quando colpisce roccia resistente
+                this.magma.vx = 0;
+                this.magma.vy = 0;
+                
+                // Segnala che il magma è bloccato da roccia resistente
+                this.magma.blockedByResistantRock = true;
+                
+                // Raffreddamento drastico del magma
+                this.magma.composition.temperature -= 50 * this.deltaTime;
+                
+                // Applica pressione alla roccia (può danneggiarla lentamente)
+                const pressure = this.magma.composition.pressure * impactForce;
+                const rockSurvives = rock.applyMagmaPressure(pressure);
+                
+                // Feedback message per roccia resistente
+                this.showFeedback("Roccia Resistente!", rock.x, rock.y - 20, '#000000');
+                
+                return rockSurvives; // Rimuovi se distrutta
+            }
+            return true; // Mantieni se non colpita
         });
         
         // Add magma trail particles based on composition
@@ -1757,6 +2497,9 @@ class VolcanoGame {
         
         // Draw rocks
         this.rocks.forEach(rock => rock.draw(this.ctx));
+        
+        // Draw resistant rocks (rocce nere)
+        this.resistantRocks.forEach(rock => rock.draw(this.ctx));
         
         // Draw water pockets
         this.waterPockets.forEach(pocket => pocket.draw(this.ctx));
