@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulcano - Gioco di Eruzione</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Schermata Menu -->
+        <div id="menuScreen" class="screen active">
+            <div class="menu-content">
+                <h1 class="game-title">🌋 VULCANO</h1>
+                <p class="game-subtitle">Fai eruttare il magma verso la superficie!</p>
+                <div class="menu-buttons">
+                    <button id="playBtn" class="btn btn-primary">GIOCA</button>
+                    <button id="leaderboardBtn" class="btn btn-secondary">CLASSIFICA</button>
+                    <button id="instructionsBtn" class="btn btn-secondary">ISTRUZIONI</button>
+                </div>
+            </div>
+            <div class="animated-background">
+                <div class="lava-flow"></div>
+                <div class="smoke-particle"></div>
+                <div class="smoke-particle"></div>
+                <div class="smoke-particle"></div>
+            </div>
+        </div>
+
+        <!-- Schermata Istruzioni -->
+        <div id="instructionsScreen" class="screen">
+            <div class="instructions-content">
+                <h2>📋 Istruzioni</h2>
+                <div class="instructions-text">
+                    <p><strong>Obiettivo:</strong> Porta il magma dal mantello terrestre fino al vulcano in superficie!</p>
+                    <p><strong>Controlli:</strong> Usa il mouse per guidare il magma e clicca per dare spinta extra</p>
+                    <p><strong>Strati Geologici:</strong> Attraversa mantello (rosso), crosta terrestre (marrone) e superficie (verde)</p>
+                    <p><strong>Faglie Geologiche:</strong> Le faglie rosse danno un potente boost verticale</p>
+                    <p><strong>Bolle di Gas:</strong> Raccogli le bolle per aumentare velocità e galleggiamento</p>
+                    <p><strong>Ostacoli:</strong> Evita le rocce che rallentano il flusso del magma</p>
+                    <p><strong>Vittoria:</strong> Raggiungi il cratere del vulcano per scatenare l'eruzione!</p>
+                </div>
+                <button id="backFromInstructions" class="btn btn-primary">TORNA AL MENU</button>
+            </div>
+        </div>
+
+        <!-- Schermata Gioco -->
+        <div id="gameScreen" class="screen">
+            <div class="game-ui">
+                <div class="ui-top">
+                    <div class="score-display">
+                        <span>Profondità: <span id="depth">0</span>m</span>
+                        <span>Velocità: <span id="speed">0</span> m/s</span>
+                        <span>Tempo: <span id="time">0</span>s</span>
+                    </div>
+                    <button id="pauseBtn" class="btn btn-small">⏸️ PAUSA</button>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <div class="progress-label">Progresso verso la superficie</div>
+                </div>
+            </div>
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <!-- Schermata Pausa -->
+        <div id="pauseScreen" class="screen">
+            <div class="pause-content">
+                <h2>⏸️ Gioco in Pausa</h2>
+                <div class="pause-buttons">
+                    <button id="resumeBtn" class="btn btn-primary">RIPRENDI</button>
+                    <button id="restartBtn" class="btn btn-secondary">RICOMINCIA</button>
+                    <button id="menuBtn" class="btn btn-secondary">MENU PRINCIPALE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schermata Game Over -->
+        <div id="gameOverScreen" class="screen">
+            <div class="gameover-content">
+                <h2 id="gameOverTitle">🎉 VITTORIA!</h2>
+                <div class="final-stats">
+                    <p>Profondità raggiunta: <span id="finalDepth">0</span>m</p>
+                    <p>Tempo impiegato: <span id="finalTime">0</span>s</p>
+                    <p>Punteggio finale: <span id="finalScore">0</span></p>
+                </div>
+                <div class="name-input-section">
+                    <label for="playerName">Inserisci il tuo nome:</label>
+                    <input type="text" id="playerName" maxlength="15" placeholder="Il tuo nome">
+                    <button id="saveScoreBtn" class="btn btn-primary">SALVA PUNTEGGIO</button>
+                </div>
+                <div class="gameover-buttons">
+                    <button id="playAgainBtn" class="btn btn-secondary">GIOCA ANCORA</button>
+                    <button id="viewLeaderboardBtn" class="btn btn-secondary">VEDI CLASSIFICA</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schermata Classifica -->
+        <div id="leaderboardScreen" class="screen">
+            <div class="leaderboard-content">
+                <h2>🏆 Classifica</h2>
+                <div class="leaderboard-list" id="leaderboardList">
+                    <!-- Popolata dinamicamente -->
+                </div>
+                <button id="backFromLeaderboard" class="btn btn-primary">TORNA AL MENU</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
