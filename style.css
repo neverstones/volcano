@@ -4,12 +4,18 @@
     box-sizing: border-box;
 }
 
-body {
+body, html { 
+    margin: 0; 
     font-family: 'Orbitron', monospace;
     background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 50%, #2d1810 100%);
     color: #ffffff;
     overflow: hidden;
     height: 100vh;
+}
+
+canvas { 
+    position: fixed; 
+    touch-action: none; 
 }
 
 #gameContainer {

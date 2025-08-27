@@ -1210,6 +1210,80 @@ class MagmaPlayer {
     }
     
     update(controls, dt) {
+        // MODALITÀ SEMPLIFICATA - OVERRIDE PER TEST BLOB
+        if (true) { // Attiva modalità semplificata
+            // Debug continuo per vedere se il gioco gira
+            if (Date.now() % 1000 < 50) { // Log ogni secondo circa
+                console.log('Game running - position:', this.x.toFixed(1), this.y.toFixed(1));
+            }
+            
+            // Reset tutti i blocchi
+            this.blockedByResistantRock = false;
+            this.nearResistantRock = false;
+            
+            // Controlli diretti con log dettagliato
+            if (controls.space) {
+                console.log('SPACE DETECTED! Moving UP directly');
+                this.vy = -15; // Movimento molto forte verso l'alto
+                this.temperature += 5;
+            }
+            if (controls.left) {
+                console.log('LEFT DETECTED!');
+                this.vx = -10;
+            }
+            if (controls.right) {
+                console.log('RIGHT DETECTED!');
+                this.vx = 10;
+            }
+            if (controls.up) {
+                console.log('UP DETECTED!');
+                this.vy = -10;
+            }
+            if (controls.down) {
+                console.log('DOWN DETECTED!');
+                this.vy = 10;
+            }
+            
+            // Test movimento automatico per vedere se il magma si muove
+            if (Date.now() % 3000 < 100) { // Ogni 3 secondi muovi automaticamente
+                console.log('AUTO MOVEMENT TEST');
+                this.vy = -20;
+            }
+            
+            // Blob physics
+            if (this.blobPoints && this.blobPoints.length > 0) {
+                this.updateBlobPhysics(dt);
+                
+                if (controls.space || controls.up) {
+                    this.applyBlobForces({ x: 0, y: -1 }, 6.0);
+                }
+                if (controls.left) {
+                    this.applyBlobForces({ x: -1, y: 0 }, 4.0);
+                }
+                if (controls.right) {
+                    this.applyBlobForces({ x: 1, y: 0 }, 4.0);
+                }
+            }
+            
+            // Attrito leggero
+            this.vx *= 0.85;
+            this.vy *= 0.9;
+            
+            // Aggiorna posizione
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+            
+            // Limiti schermo
+            this.x = Math.max(this.radius, Math.min(GAME_CONFIG.canvas.width - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(GAME_CONFIG.canvas.height - this.radius, this.y));
+            
+            console.log('Position:', this.x.toFixed(1), this.y.toFixed(1), 'Velocity:', this.vx.toFixed(1), this.vy.toFixed(1));
+            
+            // Update composizione
+            this.composition.update(dt);
+            return; // Esci qui, salta tutto il resto
+        }
+        
         // Gestione boost di velocità da faglia geologica
         if (this.faultSpeedBoost && this.faultSpeedBoost.active) {
             const elapsed = Date.now() - this.faultSpeedBoost.startTime;
