@@ -1,125 +1,111 @@
-import pygame
-import random
+import pygame, random, math
 
-# Inizializzazione
 pygame.init()
-LARGHEZZA, ALTEZZA = 600, 800
-schermo = pygame.display.set_mode((LARGHEZZA, ALTEZZA))
-pygame.display.set_caption("Magma Riser")
+WIDTH, HEIGHT = 500, 500
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Wobbly Ball con Scia Gradiente")
+
 clock = pygame.time.Clock()
 
-# Colori
-ROSSO = (255, 50, 50)
-GIALLO = (255, 255, 0)
-BLU = (0, 150, 255)
-NERO = (0, 0, 0)
-BIANCO = (255, 255, 255)
+# Proprietà palla
+x, y = WIDTH // 2, HEIGHT // 2
+vx = vy = 0
+radius = 40
+stretch_x = stretch_y = 1.0
 
-# Costanti fisiche
-gravity = 0.4
-spinta = -10
-friction = 0.98
-fluidita_bonus = 1.5
+# Colore iniziale
+orange = (255, 165, 0)
+red = (255, 0, 0)
+black = (10, 10, 20)
 
-# Magma
-magma = pygame.Rect(LARGHEZZA//2 - 15, ALTEZZA - 50, 30, 30)
-magma_vel = 0
-viscosita = 1.0
-raffreddamento = 100  # percentuale
-fluid_timer = 0
+# Scia
+trail = []
+MAX_TRAIL = 40
 
-# Mappa
-scroll = 0
-profondita = 0
-font = pygame.font.SysFont(None, 32)
+# Particelle
+particles = []
 
-# Faglie e acqua
-faglie = []
-acqua = []
+class Particle:
+    def __init__(self, x, y, color):
+        self.x = x + random.uniform(-5,5)
+        self.y = y + random.uniform(-5,5)
+        self.vx = random.uniform(-1, 1)
+        self.vy = random.uniform(-2, -0.5)
+        self.life = random.randint(20, 40)
+        self.color = color
 
-for i in range(20):
-    x = random.randint(50, LARGHEZZA-50)
-    y = random.randint(-3000, -50)
-    if i % 3 == 0:
-        acqua.append(pygame.Rect(x, y, 40, 20))
-    else:
-        faglie.append(pygame.Rect(x, y, 50, 20))
+    def update(self):
+        self.x += self.vx
+        self.y += self.vy
+        self.vy += 0.1
+        self.life -= 1
 
-# Game loop
+    def draw(self, surface):
+        alpha = max(0, int(255 * (self.life / 40)))
+        s = pygame.Surface((6,6), pygame.SRCALPHA)
+        pygame.draw.circle(s, (*self.color, alpha), (3,3), 3)
+        surface.blit(s, (self.x, self.y))
+
+def lerp_color(c1, c2, t):
+    return tuple(int(c1[i] * (1 - t) + c2[i] * t) for i in range(3))
+
 running = True
 while running:
-    clock.tick(60)
-    schermo.fill(NERO)
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+    for e in pygame.event.get():
+        if e.type == pygame.QUIT:
             running = False
 
-    tasti = pygame.key.get_pressed()
-    if tasti[pygame.K_SPACE] and raffreddamento > 0:
-        magma_vel += spinta * (1.0 / viscosita)
-        raffreddamento -= 0.2
+    keys = pygame.key.get_pressed()
+    speed = 4
+    vx = vy = 0
+    if keys[pygame.K_LEFT]:  vx = -speed
+    if keys[pygame.K_RIGHT]: vx = speed
+    if keys[pygame.K_UP]:    vy = -speed
+    if keys[pygame.K_DOWN]:  vy = speed
 
-    # Fisica del magma
-    magma_vel += gravity
-    magma_vel *= friction
-    magma.y += int(magma_vel)
+    x += vx
+    y += vy
+    stretch_x += (1.0 + vx*0.1 - stretch_x) * 0.2
+    stretch_y += (1.0 + vy*0.1 - stretch_y) * 0.2
+    stretch_x += (1.0 - stretch_x) * 0.05
+    stretch_y += (1.0 - stretch_y) * 0.05
 
-    # Raffreddamento
-    if magma_vel > 5:
-        raffreddamento -= 0.1
-    if raffreddamento <= 0:
-        running = False  # game over per raffreddamento
+    trail.append((x, y))
+    if len(trail) > MAX_TRAIL:
+        trail.pop(0)
 
-    # Fluidità da acqua
-    if fluid_timer > 0:
-        viscosita = 0.5
-        fluid_timer -= 1
-    else:
-        viscosita = 1.0
+    if vx or vy:
+        for _ in range(2):
+            particles.append(Particle(x, y, orange))
 
-    # Scroll
-    if magma.y < ALTEZZA//2:
-        offset = ALTEZZA//2 - magma.y
-        magma.y = ALTEZZA//2
-        scroll += offset
-        profondita += offset
-        for f in faglie:
-            f.y += offset
-        for a in acqua:
-            a.y += offset
+    for p in particles[:]:
+        p.update()
+        if p.life <= 0:
+            particles.remove(p)
 
-    # Collisioni
-    for f in faglie:
-        if magma.colliderect(f):
-            magma_vel = spinta * 0.8
+    screen.fill(black)
 
-    for a in acqua:
-        if magma.colliderect(a):
-            fluid_timer = 180  # 3 secondi a 60 FPS
+    # Disegna scia (invertita: più grossa/luminosa vicino alla palla)
+    for i, (tx, ty) in enumerate(reversed(trail)):
+        t = i / len(trail)
+        if t < 0.5:
+            col = lerp_color(orange, red, t * 2)
+        else:
+            col = lerp_color(red, black, (t - 0.5) * 2)
+        alpha = int(255 * (1 - t))
+        size = int(radius * (1.0 - 0.7 * t))  # più grande vicino alla palla
+        s = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
+        pygame.draw.circle(s, (*col, alpha), (size, size), size)
+        screen.blit(s, (tx - size, ty - size))
 
-    # Disegno
-    pygame.draw.rect(schermo, ROSSO, magma)
-    for f in faglie:
-        pygame.draw.rect(schermo, GIALLO, f)
-    for a in acqua:
-        pygame.draw.rect(schermo, BLU, a)
+    for p in particles:
+        p.draw(screen)
 
-    barra = pygame.Rect(10, 10, int(raffreddamento * 2), 10)
-    pygame.draw.rect(schermo, BIANCO, (10, 10, 200, 10), 1)
-    pygame.draw.rect(schermo, ROSSO, barra)
-
-    testo = font.render(f"Profondita risalita: {profondita} m", True, BIANCO)
-    schermo.blit(testo, (10, 30))
-
-    # Vittoria
-    if profondita > 3000:
-        testo = font.render("Eruzione riuscita!", True, GIALLO)
-        schermo.blit(testo, (LARGHEZZA//2 - 100, ALTEZZA//2))
-        pygame.display.flip()
-        pygame.time.delay(3000)
-        running = False
+    ellipse_rect = pygame.Rect(0, 0, radius*2*stretch_x, radius*2*stretch_y)
+    ellipse_rect.center = (x, y)
+    pygame.draw.ellipse(screen, orange, ellipse_rect)
 
     pygame.display.flip()
+    clock.tick(60)
 
 pygame.quit()
