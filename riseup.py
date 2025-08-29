@@ -1,6 +1,21 @@
 import pygame, random, math, sys
+import logging
+from datetime import datetime
 
 pygame.init()
+
+# Configurazione del logging
+log_filename = f"volcano_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.DEBUG,
+    format='%(asctime)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+
+def log_debug(message):
+    print(f"DEBUG - {message}")
+    logging.debug(message)
 
 # ----------------- Window -----------------
 WIDTH, HEIGHT = 600, 800
@@ -9,11 +24,29 @@ pygame.display.set_caption("Volcano Jump - PNG Background")
 clock = pygame.time.Clock()
 FONT = pygame.font.SysFont("Arial", 20)
 
+# ----------------- Game Levels -----------------
+LEVEL_MANTELLO = 0
+LEVEL_CROSTA = 1
+LEVEL_VULCANO = 2
+
+level_names = ["Mantello", "Crosta Terrestre", "Vulcano"]
+# Definiamo le altezze in km per ogni livello
+MANTELLO_HEIGHT = 15  # 15 km per il mantello
+CROSTA_HEIGHT = 30    # +15 km per la crosta (totale 30km)
+VULCANO_HEIGHT = 40   # +10 km per il vulcano (totale 40km)
+
+level_heights = [MANTELLO_HEIGHT * 1000, (CROSTA_HEIGHT - MANTELLO_HEIGHT) * 1000, (VULCANO_HEIGHT - CROSTA_HEIGHT) * 1000]  # conversione in pixel (1 km = 1000 pixel)
+level_colors = [
+    (255, 100, 0),    # Mantello: rosso-arancio caldo
+    (139, 69, 19),    # Crosta: marrone
+    (169, 169, 169)   # Vulcano: grigio
+]
+
 # ----------------- Load Background Tiles -----------------
 bg_tiles = [
-    pygame.image.load("./RoundedBlocks/lava.png").convert(),
-    pygame.image.load("./RoundedBlocks/stone.png").convert(),
-    pygame.image.load("./RoundedBlocks/ground.png").convert_alpha()
+    pygame.image.load("./RoundedBlocks/lava.png").convert(),    # mantello
+    pygame.image.load("./RoundedBlocks/stone.png").convert(),   # crosta
+    pygame.image.load("./RoundedBlocks/ground.png").convert_alpha()  # vulcano
 ]
 
 # scale tiles
@@ -50,26 +83,34 @@ class WobblyBall:
         self.particles = []
 
     def apply_input(self, keys):
-        speed = 5
+        accel = 1.2
+        max_speed = 8
+        friction = 0.85
+        
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            self.vx = -speed
+            self.vx = max(-max_speed, self.vx - accel)
         elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            self.vx = speed
+            self.vx = min(max_speed, self.vx + accel)
         else:
-            self.vx = 0
+            self.vx *= friction  # scivolamento graduale
 
     def update_physics(self, dt, gravity=0.8):
-        self.vy += gravity
+        # Limita la velocità massima di caduta
+        max_fall_speed = 15
+        self.vy = min(self.vy + gravity, max_fall_speed)
+        
+        # Aggiorna posizione
         self.x += self.vx
         self.y += self.vy
 
-        # horizontal walls
+        # Rimbalzo dalle pareti con effetto elastico
+        bounce_factor = 0.7
         if self.x - self.radius < 0:
             self.x = self.radius
-            self.vx = 0
+            self.vx = abs(self.vx) * bounce_factor
         if self.x + self.radius > WIDTH:
             self.x = WIDTH - self.radius
-            self.vx = 0
+            self.vx = -abs(self.vx) * bounce_factor
 
         # trail
         self.trail.insert(0, (self.x, self.y))
@@ -142,19 +183,29 @@ def lerp_color(c1, c2, t):
             int(c1[2]*(1-t)+c2[2]*t))
 
 def check_platform_collision(ball, platforms, world_offset):
-    # collisione se scende o fermo appoggiato
     for i, plat in enumerate(platforms):
         plat_rect = plat.copy()
         plat_rect.y += world_offset
+        
+        # Verifica collisione orizzontale
         if ball.x + ball.radius > plat_rect.left and ball.x - ball.radius < plat_rect.right:
-            if ball.vy >= 0 and ball.y + ball.radius >= plat_rect.top and ball.y + ball.radius <= plat_rect.top + max(ball.vy,5):
-                return True, i
+            # Verifica collisione verticale solo quando la palla sta scendendo (vy >= 0)
+            if ball.vy >= 0:
+                ball_bottom = ball.y + ball.radius
+                # Aumenta il margine di collisione per rendere più facile atterrare
+                margin = 10
+                if ball_bottom >= plat_rect.top - margin and ball_bottom <= plat_rect.top + ball.vy + margin:
+                    print(f"DEBUG - Collisione con piattaforma {i} - Tipo: {platform_types[i]}")
+                    print(f"DEBUG - Posizione piattaforma: y={plat_rect.y}, player y={ball.y}")
+                    return True, i
     return False, None
 
 
 
+# ----------------- Reset Game -----------------
+
 def reset_game():
-    global player, world_offset, score, GAME_OVER, tiles_revealed
+    global player, world_offset, score, GAME_OVER, tiles_revealed, platforms, platform_types, current_level
     player.x = WIDTH//2
     player.y = HEIGHT - 100
     player.vx = player.vy = 0
@@ -164,10 +215,50 @@ def reset_game():
     world_offset = 0
     score = 0
     GAME_OVER = False
-    tiles_revealed = 1  # mostra solo primo tile
+    tiles_revealed = 1
+    current_level = LEVEL_MANTELLO
+    
+    print("DEBUG - Resettando il gioco")
+    
+    # Resetta le piattaforme
+    platforms = []
+    platform_types = []
+    
+    # Crea piattaforme iniziali
+    for i in range(15):  # Aumenta il numero di piattaforme iniziali
+        x = random.randint(50, WIDTH-100)
+        y = HEIGHT - 100 - i * 100
+        plat_width = 64
+        platforms.append(pygame.Rect(x, y, plat_width, 16))
+        plat_type = random.choices([0,1,2], weights=[40,40,20])[0]  # Più probabilità di boost all'inizio
+        platform_types.append(plat_type)
+        print(f"DEBUG - Creata piattaforma iniziale tipo {plat_type} a y={y}")
+    
+    # Piattaforma di partenza più larga
+    start_platform = pygame.Rect(WIDTH//2 - 50, HEIGHT - 50, 100, 16)
+    platforms.insert(0, start_platform)
+    platform_types.insert(0, 0)
+    
+    # Resetta le piattaforme iniziali del livello mantello
+    platforms = []
+    platform_types = []
+    
+    # Genera le prime piattaforme del mantello
+    for i in range(6):
+        x = random.randint(50, WIDTH-100)
+        y = HEIGHT - 100 - i * 120
+        plat_width = 64
+        platforms.append(pygame.Rect(x, y, plat_width, 16))
+        # Nel mantello: più piattaforme boost
+        plat_type = random.choices([0,1,2], weights=[50,35,15])[0]
+        platform_types.append(plat_type)
+    
+    # Piattaforma di partenza più larga e stabile
+    start_platform = pygame.Rect(WIDTH//2 - 50, HEIGHT - 50, 100, 16)
+    platforms.insert(0, start_platform)
+    platform_types.insert(0, 0)  # piattaforma normale
 
 def draw_background():
-    # Mostra solo i tile in base al numero di salti
     for i in range(tiles_revealed):
         screen.blit(bg_tiles[i], (0,0))
 
@@ -177,11 +268,12 @@ world_offset = 0
 t_global = 0
 score = 0
 GAME_OVER = False
-tiles_revealed = 1  # solo primo tile inizialmente
+tiles_revealed = 1
 jumps_made = 0
+current_level = LEVEL_MANTELLO  # Inizializza il livello corrente
 
 def main():
-    global t_global, world_offset, score, GAME_OVER, tiles_revealed, jumps_made
+    global t_global, world_offset, score, GAME_OVER, tiles_revealed, jumps_made, current_level
     running = True
     while running:
         dt = clock.tick(60)/1000.0
@@ -190,56 +282,136 @@ def main():
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
                 running = False
-            if ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_SPACE:
+            elif ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_SPACE and not GAME_OVER:
                     grounded, idx = check_platform_collision(player, platforms, world_offset)
-                    if grounded and not GAME_OVER:
-                        plat = platforms[idx]
-                        player.y = plat.top - player.radius
-                        if platform_types[idx] == 1:
-                            player.vy = -22  # jump boost
-                            jumps_made += 1
-                        else:
-                            player.vy = -15  # normal jump
-                            jumps_made += 1
-                            if platform_types[idx] == 2:
-                                jumps_made += 1
-                                player.radius = min(80, player.radius + 6)  # increase size on bouncy
-                                score += 15
+                    if grounded:
+                        player.vy = -14  # Salto standard per tutte le piattaforme
 
-                if ev.key == pygame.K_r and GAME_OVER:
+                elif ev.key == pygame.K_r and GAME_OVER:
                     reset_game()
 
         keys = pygame.key.get_pressed()
         player.apply_input(keys)
         player.update_physics(dt)
 
-        # scrolling
-        SCROLL_THRESH = HEIGHT*0.35
-        highest_platform_y = min([p.y + world_offset for p in platforms])
-        if player.y < SCROLL_THRESH and player.y < highest_platform_y + 100:
+        # scroll e gestione livelli
+        SCROLL_THRESH = HEIGHT * 0.35
+        if player.y < SCROLL_THRESH:
             dy = SCROLL_THRESH - player.y
             world_offset += dy
-            player.y = SCROLL_THRESH
-            score += int(dy*0.2)
+            score += int(dy * 0.2)
+            
+            # Determina il livello corrente in base all'altezza in km
+            current_level = LEVEL_MANTELLO
+            current_height = -world_offset
+            height_km = current_height / 1000  # Converti in km
+            log_debug(f"Stato gioco - Altezza: {height_km:.2f} km, World offset: {world_offset}, Player y: {player.y}, Velocità y: {player.vy}")
+            
+            # Cambio livello basato sui km
+            if height_km > MANTELLO_HEIGHT:
+                current_level = LEVEL_CROSTA
+                if not tiles_revealed == 2:
+                    print(f"DEBUG - Passaggio alla Crosta Terrestre a {height_km:.2f} km")
+                    tiles_revealed = 2
+            if height_km > CROSTA_HEIGHT:
+                current_level = LEVEL_VULCANO
+                if not tiles_revealed == 3:
+                    print(f"DEBUG - Passaggio al Vulcano a {height_km:.2f} km")
+                    tiles_revealed = 3
+            print(f"DEBUG - Livello corrente: {level_names[current_level]}")
+            
+            # Genera piattaforme specifiche per il livello
+            # Trova la piattaforma più alta considerando l'offset del mondo
+            highest_plat = float('inf')
+            for p in platforms:
+                plat_height = p.y + world_offset
+                highest_plat = min(highest_plat, plat_height)
+                print(f"DEBUG - Piattaforma a y: {p.y}, con offset: {plat_height}")
+            
+            print(f"DEBUG - Piattaforma più alta trovata a: {highest_plat}")
+            
+            # Genera nuove piattaforme se necessario
+            platforms_generated = 0
+            max_height = -8 * HEIGHT  # Aumentiamo ancora di più il buffer di piattaforme sopra lo schermo
+            while (highest_plat > max_height or len(platforms) < 150) and len(platforms) < 250:  # Aumentiamo significativamente il numero di piattaforme
+                x = random.randint(50, WIDTH-100)
+                # Riduciamo la distanza tra le piattaforme per garantire salti più fluidi
+                min_dist = 30  # Distanza minima tra piattaforme
+                max_dist = 45  # Distanza massima tra piattaforme
+                y = highest_plat - random.randint(min_dist, max_dist)
+                plat_width = random.randint(90, 130)  # Piattaforme ancora più larghe per facilitare l'atterraggio
+                print(f"DEBUG - Tentativo generazione piattaforma a y={y}")
+                platforms_generated += 1
+                
+                # Tutte le piattaforme saranno normali, cambia solo lo sfondo per livello
+                plat_type = 0  # Solo piattaforme normali
+                plat_width = random.randint(90, 130)  # piattaforme larghe per facile atterraggio
+                if current_level == LEVEL_MANTELLO:
+                    log_debug(f"Nuova piattaforma MANTELLO - Y: {y}, Width: {plat_width}, Distanza dalla precedente: {highest_plat - y}")
+                elif current_level == LEVEL_CROSTA:
+                    log_debug(f"Nuova piattaforma CROSTA - Y: {y}, Width: {plat_width}, Distanza dalla precedente: {highest_plat - y}")
+                else:
+                    log_debug(f"Nuova piattaforma VULCANO - Y: {y}, Width: {plat_width}, Distanza dalla precedente: {highest_plat - y}")
+                    print(f"DEBUG - Generata piattaforma VULCANO - Tipo: {plat_type}")
+                
+                platforms.append(pygame.Rect(x, y, plat_width, 16))
+                platform_types.append(plat_type)
+                highest_plat = y
+                
+            # Rimuovi piattaforme troppo in basso
+            platforms_before = len(platforms)
+            while len(platforms) > 120 and platforms[-1].y + world_offset > HEIGHT * 2:  # Manteniamo più piattaforme attive
+                removed_y = platforms[-1].y + world_offset
+                removed_type = platform_types[-1]
+                platforms.pop()
+                platform_types.pop()
+                print(f"DEBUG - Rimossa piattaforma a y={removed_y}, tipo={removed_type}")
+            
+            if platforms_before != len(platforms):
+                print(f"DEBUG - Piattaforme rimosse: {platforms_before - len(platforms)}")
+                print(f"DEBUG - Piattaforme rimanenti: {len(platforms)}")
+                print(f"DEBUG - Tipi rimanenti: {platform_types}")
+            
+            # Aggiorna il background in base al livello
+            if current_height > sum(level_heights):
+                # Il giocatore ha raggiunto la cima del vulcano!
+                GAME_OVER = True
+                score += 10000  # bonus completamento
 
-        # collision
+        # collision e rimbalzo
         grounded, idx = check_platform_collision(player, platforms, world_offset)
-        if grounded:
+        if grounded and player.vy >= 0:  # Solo quando sta scendendo o è fermo
             plat = platforms[idx]
-            player.y = plat.top - player.radius
-            player.vy = 0
-            player.radius = min(80, player.base_radius)  # reset radius when grounded
+            player.y = plat.top + world_offset - player.radius  # Correggi la posizione considerando l'offset
+            
+            # Tutte le piattaforme hanno lo stesso rimbalzo
+            player.vy = -14  # Rimbalzo standard per tutte le piattaforme
+            log_debug(f"Rimbalzo - Pos Y: {player.y}, Velocità Y: {player.vy}, Piattaforma Y: {plat.top + world_offset}")            # Effetto sonoro e particelle (opzionale)
+            player.particles.extend([
+                [player.x + random.uniform(-20,20),
+                 player.y + player.radius,
+                 random.uniform(1,3),
+                 random.randint(20,30)]
+                for _ in range(5)
+            ])
+            
 
         # game over
         if player.y - player.radius > HEIGHT:
             GAME_OVER = True
+            log_debug(f"GAME OVER - Pos Y: {player.y}, Velocità Y: {player.vy}, Ultima piattaforma Y: {platforms[-1].y + world_offset}")
 
         # ----------------- Draw -----------------
         screen.fill((0,0,0))
         draw_background()
+        
+        # Mostra altezza e livello corrente
+        height_text = FONT.render(f"Altezza: {(-world_offset/1000):.2f} km", True, (255, 255, 255))
+        level_text = FONT.render(f"Livello: {level_names[current_level]}", True, (255, 255, 255))
+        screen.blit(height_text, (10, 10))
+        screen.blit(level_text, (10, 40))
 
-        # draw platforms
         for i, plat in enumerate(platforms):
             rect = plat.copy()
             rect.y += world_offset
@@ -255,11 +427,49 @@ def main():
         player.draw_particles(screen)
         player.draw_wobbly(screen, t_global)
 
-        txt = FONT.render(f"Score: {score}", True, (255,255,255))
+        # Determina il livello corrente e progresso
+        current_height = -world_offset
+        current_level = LEVEL_MANTELLO
+        level_progress = 0
+        
+        if current_height > level_heights[LEVEL_MANTELLO]:
+            current_level = LEVEL_CROSTA
+            level_progress = (current_height - level_heights[LEVEL_MANTELLO]) / level_heights[LEVEL_CROSTA]
+        elif current_height > 0:
+            level_progress = current_height / level_heights[LEVEL_MANTELLO]
+            
+        if current_height > level_heights[LEVEL_MANTELLO] + level_heights[LEVEL_CROSTA]:
+            current_level = LEVEL_VULCANO
+            level_progress = (current_height - (level_heights[LEVEL_MANTELLO] + level_heights[LEVEL_CROSTA])) / level_heights[LEVEL_VULCANO]
+        
+        # Visualizza informazioni
+        total_score = score + int(current_height * 0.1)
+        txt = FONT.render(f"Score: {total_score}", True, (255,255,255))
         screen.blit(txt, (10,10))
+        
+        # Mostra livello corrente e progresso
+        level_txt = FONT.render(f"Livello: {level_names[current_level]}", True, level_colors[current_level])
+        screen.blit(level_txt, (10,40))
+        
+        # Barra di progresso del livello
+        progress = int(level_progress * 100)
+        progress_txt = FONT.render(f"Progresso: {progress}%", True, (255,220,100))
+        screen.blit(progress_txt, (10,70))
+        
         if GAME_OVER:
-            txt = FONT.render("GAME OVER - Press R to restart", True, (255,0,0))
-            screen.blit(txt, (WIDTH//2-140, HEIGHT//2))
+            if current_height > sum(level_heights):
+                # Vittoria!
+                victory_txt = FONT.render("VITTORIA! - Eruzione Completata!", True, (255,215,0))
+                screen.blit(victory_txt, (WIDTH//2-180, HEIGHT//2))
+                bonus_txt = FONT.render("Bonus Completamento: +10000", True, (255,215,0))
+                screen.blit(bonus_txt, (WIDTH//2-140, HEIGHT//2+30))
+            else:
+                # Game Over normale
+                txt = FONT.render("GAME OVER - Press R to restart", True, (255,0,0))
+                screen.blit(txt, (WIDTH//2-140, HEIGHT//2))
+            
+            final_score = FONT.render(f"Punteggio Finale: {total_score}", True, (255,200,0))
+            screen.blit(final_score, (WIDTH//2-100, HEIGHT//2+60))
 
         pygame.display.flip()
 
