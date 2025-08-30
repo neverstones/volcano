@@ -30,12 +30,63 @@ LEVEL_CROSTA = 1
 LEVEL_VULCANO = 2
 
 level_names = ["Mantello", "Crosta Terrestre", "Vulcano"]
-# Definiamo le altezze in km per ogni livello
-MANTELLO_HEIGHT = 15  # 15 km per il mantello
-CROSTA_HEIGHT = 30    # +15 km per la crosta (totale 30km)
-VULCANO_HEIGHT = 40   # +10 km per il vulcano (totale 40km)
 
-level_heights = [MANTELLO_HEIGHT * 1000, (CROSTA_HEIGHT - MANTELLO_HEIGHT) * 1000, (VULCANO_HEIGHT - CROSTA_HEIGHT) * 1000]  # conversione in pixel (1 km = 1000 pixel)
+# Definizione della mappa come lista di coordinate
+# Formato: (x, y_offset, livello)
+# x: posizione orizzontale
+# y_offset: distanza dalla piattaforma precedente
+# livello: 0=mantello, 1=crosta, 2=vulcano
+GAME_MAP = [
+    # Piattaforma iniziale
+    (WIDTH//2 - 50, 50, 0),  # Piattaforma di partenza più larga
+    
+    # Livello Mantello
+    (100, 120, 0),    (400, 100, 0),
+    (200, 120, 0),    (450, 100, 0),
+    (150, 120, 0),    (380, 100, 0),
+    (250, 120, 0),    (420, 100, 0),
+    (180, 120, 0),    (350, 100, 0),
+    (120, 120, 0),    (400, 100, 0),
+    (220, 120, 0),    (380, 100, 0),
+    (150, 120, 0),    (450, 100, 0),
+    
+    # Livello Crosta
+    (200, 120, 1),    (420, 100, 1),
+    (150, 120, 1),    (380, 100, 1),
+    (250, 120, 1),    (420, 100, 1),
+    (180, 120, 1),    (350, 100, 1),
+    (120, 120, 1),    (400, 100, 1),
+    (220, 120, 1),    (380, 100, 1),
+    (150, 120, 1),    (450, 100, 1),
+    (200, 120, 1),    (400, 100, 1),
+    
+    # Livello Vulcano
+    (200, 120, 2),    (420, 100, 2),
+    (150, 120, 2),    (380, 100, 2),
+    (250, 120, 2),    (420, 100, 2),
+    (180, 120, 2),    (350, 100, 2),
+    (120, 120, 2),    (400, 100, 2),
+    (220, 120, 2),    (380, 100, 2),
+    (150, 120, 2),    (450, 100, 2),
+    (200, 120, 2),    (400, 100, 2),
+]
+
+# Altezze dei livelli calcolate in base alla mappa
+def calculate_level_heights():
+    heights = [0, 0, 0]  # mantello, crosta, vulcano
+    current_height = 0
+    
+    for _, y_offset, level in GAME_MAP:
+        current_height += y_offset
+        heights[level] = max(heights[level], current_height)
+    
+    return heights
+
+level_heights = calculate_level_heights()
+MANTELLO_END = level_heights[0]
+CROSTA_END = level_heights[1]
+VULCANO_END = level_heights[2]
+
 level_colors = [
     (255, 100, 0),    # Mantello: rosso-arancio caldo
     (139, 69, 19),    # Crosta: marrone
@@ -54,19 +105,29 @@ for i in range(len(bg_tiles)):
     bg_tiles[i] = pygame.transform.scale(bg_tiles[i], (WIDTH, HEIGHT))
 
 # ----------------- Platforms -----------------
-platforms = [
-    pygame.Rect(100, 700, 64, 16),
-    pygame.Rect(250, 600, 64, 16),
-    pygame.Rect(400, 500, 64, 16),
-    pygame.Rect(150, 400, 64, 16),
-    pygame.Rect(300, 300, 64, 16),
-]
-platform_types = [0,1,0,2,0]
+# Definizione delle piattaforme statiche per ogni livello
+def create_static_platforms():
+    platforms = []
+    platform_types = []
+    platform_width = 100
+    current_y = HEIGHT - 50  # Altezza iniziale
+    
+    # Crea le piattaforme dalla mappa definita
+    for x, y_offset, level in GAME_MAP:
+        # Calcola la posizione y sottraendo l'offset dall'altezza corrente
+        current_y -= y_offset
+        
+        # Crea la piattaforma
+        platform = pygame.Rect(x, current_y, platform_width, 16)
+        platforms.append(platform)
+        platform_types.append(level)
+        
+        log_debug(f"Creata piattaforma a x={x}, y={current_y}, livello={level_names[level]}")
+    
+    return platforms, platform_types
 
-# Starting platform under player
-start_platform = pygame.Rect(WIDTH//2 - 40, HEIGHT - 50, 80, 16)
-platforms.insert(0, start_platform)
-platform_types.insert(0,0)
+# Inizializza le piattaforme statiche
+platforms, platform_types = create_static_platforms()
 
 # ----------------- WobblyBall -----------------
 class WobblyBall:
@@ -198,6 +259,7 @@ def check_platform_collision(ball, platforms, world_offset):
                     print(f"DEBUG - Collisione con piattaforma {i} - Tipo: {platform_types[i]}")
                     print(f"DEBUG - Posizione piattaforma: y={plat_rect.y}, player y={ball.y}")
                     return True, i
+        
     return False, None
 
 
@@ -206,64 +268,67 @@ def check_platform_collision(ball, platforms, world_offset):
 
 def reset_game():
     global player, world_offset, score, GAME_OVER, tiles_revealed, platforms, platform_types, current_level
-    player.x = WIDTH//2
-    player.y = HEIGHT - 100
-    player.vx = player.vy = 0
+    
+    # Reinizializza le piattaforme statiche
+    platforms, platform_types = create_static_platforms()
+    
+    # Posiziona il player esattamente sulla prima piattaforma
+    start_platform = platforms[0]  # La prima piattaforma è quella di partenza
+    player.x = start_platform.centerx
+    player.y = start_platform.top - player.radius  # Posiziona il player esattamente sopra la piattaforma
+    player.vx = 0
+    player.vy = 0
     player.radius = player.base_radius
     player.trail.clear()
     player.particles.clear()
+    
     world_offset = 0
     score = 0
     GAME_OVER = False
     tiles_revealed = 1
     current_level = LEVEL_MANTELLO
     
-    print("DEBUG - Resettando il gioco")
-    
-    # Resetta le piattaforme
-    platforms = []
-    platform_types = []
-    
-    # Crea piattaforme iniziali
-    for i in range(15):  # Aumenta il numero di piattaforme iniziali
-        x = random.randint(50, WIDTH-100)
-        y = HEIGHT - 100 - i * 100
-        plat_width = 64
-        platforms.append(pygame.Rect(x, y, plat_width, 16))
-        plat_type = random.choices([0,1,2], weights=[40,40,20])[0]  # Più probabilità di boost all'inizio
-        platform_types.append(plat_type)
-        print(f"DEBUG - Creata piattaforma iniziale tipo {plat_type} a y={y}")
-    
-    # Piattaforma di partenza più larga
-    start_platform = pygame.Rect(WIDTH//2 - 50, HEIGHT - 50, 100, 16)
-    platforms.insert(0, start_platform)
-    platform_types.insert(0, 0)
-    
-    # Resetta le piattaforme iniziali del livello mantello
-    platforms = []
-    platform_types = []
-    
-    # Genera le prime piattaforme del mantello
-    for i in range(6):
-        x = random.randint(50, WIDTH-100)
-        y = HEIGHT - 100 - i * 120
-        plat_width = 64
-        platforms.append(pygame.Rect(x, y, plat_width, 16))
-        # Nel mantello: più piattaforme boost
-        plat_type = random.choices([0,1,2], weights=[50,35,15])[0]
-        platform_types.append(plat_type)
-    
-    # Piattaforma di partenza più larga e stabile
-    start_platform = pygame.Rect(WIDTH//2 - 50, HEIGHT - 50, 100, 16)
-    platforms.insert(0, start_platform)
-    platform_types.insert(0, 0)  # piattaforma normale
+    log_debug(f"Gioco resettato - Player posizionato a x={player.x}, y={player.y} sulla piattaforma iniziale")
 
 def draw_background():
-    for i in range(tiles_revealed):
-        screen.blit(bg_tiles[i], (0,0))
+    # Disegna lo sfondo in base al livello corrente
+    current_height = -world_offset
+    tile_height = HEIGHT  # Altezza di ogni tile
+    
+    # Calcola quanti tile per ogni livello dobbiamo disegnare
+    mantello_tiles = max(1, int(MANTELLO_END / tile_height))
+    crosta_tiles = max(1, int((CROSTA_END - MANTELLO_END) / tile_height))
+    vulcano_tiles = max(1, int((VULCANO_END - CROSTA_END) / tile_height))
+    
+    # Disegna i tile del livello MANTELLO
+    mantello_start = 0
+    for i in range(mantello_tiles):
+        y_pos = i * tile_height + world_offset
+        if y_pos + tile_height > 0:  # Solo se il tile è visibile
+            screen.blit(bg_tiles[LEVEL_MANTELLO], (0, y_pos))
+    
+    # Disegna i tile del livello CROSTA
+    if current_height > MANTELLO_END:
+        crosta_start = MANTELLO_END
+        for i in range(crosta_tiles):
+            y_pos = crosta_start + i * tile_height + world_offset
+            if y_pos + tile_height > 0:  # Solo se il tile è visibile
+                screen.blit(bg_tiles[LEVEL_CROSTA], (0, y_pos))
+    
+    # Disegna i tile del livello VULCANO
+    if current_height > CROSTA_END:
+        vulcano_start = CROSTA_END
+        for i in range(vulcano_tiles):
+            y_pos = vulcano_start + i * tile_height + world_offset
+            if y_pos + tile_height > 0:  # Solo se il tile è visibile
+                screen.blit(bg_tiles[LEVEL_VULCANO], (0, y_pos))
+    
+    log_debug(f"Background - Altezza: {current_height}, Livello: {level_names[current_level]}")
 
 # ----------------- Game Loop -----------------
-player = WobblyBall(WIDTH//2, HEIGHT - 100)
+# Inizializza il player alla posizione di partenza
+start_platform = platforms[0]  # La prima piattaforma è quella di partenza
+player = WobblyBall(start_platform.centerx, start_platform.top - 32)  # 32 è il raggio predefinito
 world_offset = 0
 t_global = 0
 score = 0
@@ -287,6 +352,8 @@ def main():
                     grounded, idx = check_platform_collision(player, platforms, world_offset)
                     if grounded:
                         player.vy = -14  # Salto standard per tutte le piattaforme
+                    else:
+                        player.vy = -10  # Salto ridotto per piattaforme più alte
 
                 elif ev.key == pygame.K_r and GAME_OVER:
                     reset_game()
@@ -296,11 +363,20 @@ def main():
         player.update_physics(dt)
 
         # scroll e gestione livelli
-        SCROLL_THRESH = HEIGHT * 0.35
+        SCROLL_THRESH = HEIGHT * 0.4  # Aumentato leggermente per dare più spazio
+        SCROLL_SPEED = 0.3  # Fattore di smoothing per lo scroll
+        
         if player.y < SCROLL_THRESH:
-            dy = SCROLL_THRESH - player.y
-            world_offset += dy
-            score += int(dy * 0.2)
+            target_dy = SCROLL_THRESH - player.y
+            actual_dy = target_dy * SCROLL_SPEED  # Scroll più graduale
+            
+            # Limita lo scroll massimo per frame
+            max_scroll = 15
+            actual_dy = min(max_scroll, actual_dy)
+            
+            world_offset += actual_dy
+            player.y += actual_dy  # Aggiorna anche la posizione del giocatore
+            score += int(actual_dy * 0.2)
             
             # Determina il livello corrente in base all'altezza in km
             current_level = LEVEL_MANTELLO
@@ -308,70 +384,25 @@ def main():
             height_km = current_height / 1000  # Converti in km
             log_debug(f"Stato gioco - Altezza: {height_km:.2f} km, World offset: {world_offset}, Player y: {player.y}, Velocità y: {player.vy}")
             
-            # Cambio livello basato sui km
-            if height_km > MANTELLO_HEIGHT:
+            # Cambio livello basato sull'altezza
+            if current_height > MANTELLO_END:
                 current_level = LEVEL_CROSTA
                 if not tiles_revealed == 2:
-                    print(f"DEBUG - Passaggio alla Crosta Terrestre a {height_km:.2f} km")
+                    log_debug(f"Passaggio alla Crosta Terrestre a altezza {current_height}")
                     tiles_revealed = 2
-            if height_km > CROSTA_HEIGHT:
+            if current_height > CROSTA_END:
                 current_level = LEVEL_VULCANO
                 if not tiles_revealed == 3:
-                    print(f"DEBUG - Passaggio al Vulcano a {height_km:.2f} km")
+                    log_debug(f"Passaggio al Vulcano a altezza {current_height}")
                     tiles_revealed = 3
-            print(f"DEBUG - Livello corrente: {level_names[current_level]}")
+            log_debug(f"Livello corrente: {level_names[current_level]}")
             
             # Genera piattaforme specifiche per il livello
-            # Trova la piattaforma più alta considerando l'offset del mondo
-            highest_plat = float('inf')
-            for p in platforms:
-                plat_height = p.y + world_offset
-                highest_plat = min(highest_plat, plat_height)
-                print(f"DEBUG - Piattaforma a y: {p.y}, con offset: {plat_height}")
-            
-            print(f"DEBUG - Piattaforma più alta trovata a: {highest_plat}")
-            
-            # Genera nuove piattaforme se necessario
-            platforms_generated = 0
-            max_height = -8 * HEIGHT  # Aumentiamo ancora di più il buffer di piattaforme sopra lo schermo
-            while (highest_plat > max_height or len(platforms) < 150) and len(platforms) < 250:  # Aumentiamo significativamente il numero di piattaforme
-                x = random.randint(50, WIDTH-100)
-                # Riduciamo la distanza tra le piattaforme per garantire salti più fluidi
-                min_dist = 30  # Distanza minima tra piattaforme
-                max_dist = 45  # Distanza massima tra piattaforme
-                y = highest_plat - random.randint(min_dist, max_dist)
-                plat_width = random.randint(90, 130)  # Piattaforme ancora più larghe per facilitare l'atterraggio
-                print(f"DEBUG - Tentativo generazione piattaforma a y={y}")
-                platforms_generated += 1
-                
-                # Tutte le piattaforme saranno normali, cambia solo lo sfondo per livello
-                plat_type = 0  # Solo piattaforme normali
-                plat_width = random.randint(90, 130)  # piattaforme larghe per facile atterraggio
-                if current_level == LEVEL_MANTELLO:
-                    log_debug(f"Nuova piattaforma MANTELLO - Y: {y}, Width: {plat_width}, Distanza dalla precedente: {highest_plat - y}")
-                elif current_level == LEVEL_CROSTA:
-                    log_debug(f"Nuova piattaforma CROSTA - Y: {y}, Width: {plat_width}, Distanza dalla precedente: {highest_plat - y}")
-                else:
-                    log_debug(f"Nuova piattaforma VULCANO - Y: {y}, Width: {plat_width}, Distanza dalla precedente: {highest_plat - y}")
-                    print(f"DEBUG - Generata piattaforma VULCANO - Tipo: {plat_type}")
-                
-                platforms.append(pygame.Rect(x, y, plat_width, 16))
-                platform_types.append(plat_type)
-                highest_plat = y
-                
-            # Rimuovi piattaforme troppo in basso
-            platforms_before = len(platforms)
-            while len(platforms) > 120 and platforms[-1].y + world_offset > HEIGHT * 2:  # Manteniamo più piattaforme attive
-                removed_y = platforms[-1].y + world_offset
-                removed_type = platform_types[-1]
-                platforms.pop()
-                platform_types.pop()
-                print(f"DEBUG - Rimossa piattaforma a y={removed_y}, tipo={removed_type}")
-            
-            if platforms_before != len(platforms):
-                print(f"DEBUG - Piattaforme rimosse: {platforms_before - len(platforms)}")
-                print(f"DEBUG - Piattaforme rimanenti: {len(platforms)}")
-                print(f"DEBUG - Tipi rimanenti: {platform_types}")
+            # Non generiamo più piattaforme dinamicamente
+            # Aggiorniamo solo il livello corrente in base all'altezza
+            current_height = -world_offset
+            height_km = current_height / 1000
+            log_debug(f"Altezza attuale: {height_km:.2f} km")
             
             # Aggiorna il background in base al livello
             if current_height > sum(level_heights):
