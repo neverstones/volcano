@@ -9,18 +9,28 @@ except pygame.error:
     print("Audio not available, running without sound")
     pygame.mixer = None
 
-# Configurazione del logging
-log_filename = f"volcano_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+# Configurazione del logging solo per eventi importanti
+log_filename = f"volcano_game_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 logging.basicConfig(
     filename=log_filename,
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(message)s',
     datefmt='%H:%M:%S'
 )
 
-def log_debug(message):
-    print(f"DEBUG - {message}")
-    logging.debug(message)
+def log_game_event(message):
+    """Logga solo eventi di gioco importanti"""
+    print(f"🌋 {message}")
+    logging.info(message)
+
+def debug_input_event(ev, prefix="KEYDOWN"):
+    if not ENABLE_INPUT_DEBUG:
+        return
+    try:
+        key_name = pygame.key.name(ev.key)
+    except Exception:
+        key_name = str(getattr(ev, 'key', '?'))
+    logging.info(f"[INPUT] {prefix} key={key_name} code={getattr(ev,'key','?')} state={_state_to_name(game_state)}")
 
 # ----------------- Audio System -----------------
 class AudioManager:
@@ -104,60 +114,113 @@ game_state = MENU
 player_name = ""
 high_scores = load_scores()
 
+# Debug input: abilita/disabilita log dei tasti premuti
+ENABLE_INPUT_DEBUG = True
+
+def _state_to_name(value):
+    return {0: "MENU", 1: "PLAYING", 2: "GAME_OVER", 3: "LEADERBOARD", 4: "ENTER_NAME"}.get(value, str(value))
+
 def draw_eruption_effects(crater_info, km_height):
     """Disegna gli effetti di eruzione usando le informazioni del cratere"""
     crater_left, crater_right, crater_top = crater_info
+    crater_width = crater_right - crater_left
+    crater_center = (crater_left + crater_right) // 2
 
     # Calcola l'intensità dell'eruzione in base alla vicinanza al cratere
     max_height = KM_PER_LEVEL[LEVEL_VULCANO]
     eruption_intensity = min(1.0, (km_height - max_height * 0.9) / (max_height * 0.1))
+    
+    # Usa il tempo per animare gli effetti
+    current_time = pygame.time.get_ticks()
+    wave = math.sin(current_time * 0.003) * 0.3 + 0.7  # Varia tra 0.4 e 1.0
 
     # Crea una superficie per gli effetti con alpha blending
     effects_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    
+    # Disegna la colonna principale di lava che sale
+    column_height = int(200 * eruption_intensity * wave)
+    column_points = []
+    base_width = crater_width * 0.7
+    
+    for y in range(column_height, 0, -10):
+        progress = y / column_height
+        width = base_width * (1 - progress * 0.7)  # Si restringe verso l'alto
+        wobble = math.sin(current_time * 0.005 + y * 0.1) * (20 * progress)
+        left = crater_center - width/2 + wobble
+        right = crater_center + width/2 + wobble
+        column_points.append((left, crater_top - y))
+        column_points.append((right, crater_top - y))
+    
+    # Disegna la colonna di lava con gradiente
+    if len(column_points) >= 4:
+        for i in range(0, len(column_points) - 2, 2):
+            points = [column_points[i], column_points[i+1],
+                     column_points[i+3], column_points[i+2]]
+            progress = 1 - (i / len(column_points))
+            alpha = int(200 * progress * eruption_intensity)
+            color = (255, int(150 * progress + 50), 0, alpha)
+            pygame.draw.polygon(effects_surface, color, points)
 
-    # Disegna particelle di lava dal cratere
-    num_particles = int(20 * eruption_intensity)
+    # Disegna particelle di lava esplosive
+    num_particles = int(40 * eruption_intensity * wave)
     for _ in range(num_particles):
-        x = random.randint(int(crater_left), int(crater_right))
-        y = random.randint(int(crater_top), int(crater_top + 100))
-        size = random.randint(2, 6)
-        alpha = random.randint(100, 200)
-        color = (255, random.randint(100, 200), 0, alpha)
-        pygame.draw.circle(effects_surface, color, (x, y), size)
+        angle = random.uniform(0, math.pi)  # Particelle verso l'alto
+        speed = random.uniform(5, 15) * eruption_intensity
+        distance = random.uniform(0, 150) * wave
+        x = crater_center + math.cos(angle) * distance
+        y = crater_top - math.sin(angle) * distance - random.uniform(0, 50)
+        size = random.randint(3, 8)
+        alpha = int(random.uniform(150, 255) * (1 - distance/200))
+        color = (255, random.randint(150, 200), 0, alpha)
+        
+        # Disegna la particella con bagliore
+        glow_size = size * 2
+        glow_alpha = alpha // 2
+        glow_color = (255, 100, 0, glow_alpha)
+        pygame.draw.circle(effects_surface, glow_color, (int(x), int(y)), glow_size)
+        pygame.draw.circle(effects_surface, color, (int(x), int(y)), size)
 
-    # Disegna un bagliore rosso intorno al cratere
-    glow_surface = pygame.Surface((crater_right - crater_left, 100), pygame.SRCALPHA)
-    glow_color = (255, 50, 0, int(100 * eruption_intensity))
-    pygame.draw.rect(glow_surface, glow_color, (0, 0, crater_right - crater_left, 100))
-    effects_surface.blit(glow_surface, (crater_left, crater_top))
+    # Disegna un intenso bagliore attorno al cratere
+    crater_glow = pygame.Surface((crater_width + 100, 150), pygame.SRCALPHA)
+    for i in range(3):  # Strati multipli di bagliore
+        glow_alpha = int(100 * eruption_intensity * wave * (3-i)/3)
+        glow_color = (255, 50, 0, glow_alpha)
+        glow_rect = pygame.Rect(50-i*20, 50-i*20, crater_width+i*40, 100+i*40)
+        pygame.draw.ellipse(crater_glow, glow_color, glow_rect)
+    effects_surface.blit(crater_glow, (crater_left-50, crater_top-50))
 
     # Aggiungi colate di lava lungo le pareti
-    num_flows = int(6 * eruption_intensity)
-    for _ in range(num_flows):
-        # Scegli un punto di partenza lungo il cratere
-        start_x = random.randint(int(crater_left), int(crater_right))
+    num_flows = int(8 * eruption_intensity)
+    for i in range(num_flows):
+        # Distribuisci i punti di partenza uniformemente
+        angle = (i / num_flows) * math.pi
+        start_x = crater_center + math.cos(angle) * crater_width/2
         start_y = crater_top
-
+        
         # Crea un percorso di lava che scende
         points = [(start_x, start_y)]
         current_x = start_x
         current_y = start_y
-
-        for _ in range(random.randint(5, 15)):
-            current_x += random.randint(-10, 10)
-            current_y += random.randint(10, 20)
-            # Mantieni il flusso entro i limiti del vulcano
-            current_x = max(crater_left, min(crater_right, current_x))
+        
+        # Usa una curva più naturale per il flusso
+        for step in range(random.randint(8, 20)):
+            progress = step / 20
+            current_x += math.sin(current_time * 0.001 + progress * 10) * 8
+            current_y += 15 - progress * 5  # Rallenta verso il basso
+            current_x = max(crater_left - 50, min(crater_right + 50, current_x))
             points.append((current_x, current_y))
-
-        # Disegna il flusso di lava
+        
+        # Disegna il flusso di lava con effetto pulsante
         if len(points) > 1:
-            lava_color = (255, random.randint(50, 150), 0, int(150 * eruption_intensity))
-            pygame.draw.lines(effects_surface, lava_color, False, points, 3)
+            pulse = (math.sin(current_time * 0.004 + i) * 0.3 + 0.7)
+            for thickness in range(6, 0, -2):
+                progress = thickness / 6
+                alpha = int(200 * progress * eruption_intensity * pulse)
+                color = (255, int(100 * progress + 50), 0, alpha)
+                pygame.draw.lines(effects_surface, color, False, points, thickness)
 
-            # Aggiungi un bagliore attorno al flusso
-            glow_color = (255, 50, 0, int(50 * eruption_intensity))
-            pygame.draw.lines(effects_surface, glow_color, False, points, 5)
+    # Applica gli effetti allo schermo
+    screen.blit(effects_surface, (0, 0))
 
     # Applica gli effetti allo schermo
     screen.blit(effects_surface, (0, 0))
@@ -204,10 +267,245 @@ level_colors = [
     (169, 169, 169)   # Vulcano
 ]
 
+# Feature flags / configurazioni
+ENABLE_VICTORY_AT_CRATER = False  # Evita fine partita automatica appena si entra nel vulcano
+
+# ----------------- Volcano Static Map (x/o) -----------------
+# 'x' = barriera solida, 'o' = spazio libero
+# Ogni carattere rappresenta un tile di dimensione TILE_SIZE
+TILE_SIZE = 32
+
+# Mappa semplice di esempio (larghezza adattata allo schermo)
+# Puoi sostituirla con una mappa più lunga/complessa o caricarla da file
+# Sezione di un vulcano a cono con cratere in cima
+VOLCANO_MAP = [
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "xooooooooooooooooooooooooooooooooooooooooooooooooooox",
+    "xxoooooooooooooooooooooooooooooooooooooooooooooooooxx",
+    "xxxoooooooooooooooooooooooooooooooooooooooooooooooxxx",
+    "xxxxoooooooooooooooooooooooooooooooooooooooooooooxxxx",
+    "xxxxxoooooooooooooooooooooooooooooooooooooooooooxxxxx",
+    "xxxxxxoooooooooooooooooooooooooooooooooooooooooxxxxxx",
+    "xxxxxxxoooooooooooooooooooooooooooooooooooooooxxxxxxx",
+    "xxxxxxxxoooooooooooooooooooooooooooooooooooooxxxxxxxx",
+    "xxxxxxxxxoooooooooooooooooooooooooooooooooooxxxxxxxxx",
+    "xxxxxxxxxxoooooooooooooooooooooooooooooooooxxxxxxxxxx",
+    "xxxxxxxxxxxoooooooooooooooooooooooooooooooxxxxxxxxxxx",
+    "xxxxxxxxxxxxoooooooooooooooooooooooooooooxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxoooooooooooooooooooooooooooxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxoooooooooooooooooooooooooxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxoooooooooooooooooooooooxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxoooooooooooooooooooooxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxoooooooooooooooooooxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxoooooooooooooooooxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxoooooooooooooooxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxxoooooooooooooxxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxxxoooooooooooxxxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxxxxoooooooooxxxxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxxxxxoooooooxxxxxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxxxxxxoooooxxxxxxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxoooxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxoxxxxxxxxxxxxxxxxxxxxxxxxxx",
+]
+
+# Calcola dimensioni della mappa in pixel
+VOLCANO_MAP_HEIGHT_PX = len(VOLCANO_MAP) * TILE_SIZE
+VOLCANO_MAP_WIDTH_PX = len(VOLCANO_MAP[0]) * TILE_SIZE
+
+def get_volcano_collision_rects():
+    """Genera i rettangoli solidi (barriere) dalla mappa statica del vulcano."""
+    rects = []
+    for row_idx, row in enumerate(VOLCANO_MAP):
+        for col_idx, ch in enumerate(row):
+            if ch == 'x':
+                x = col_idx * TILE_SIZE
+                y = (len(VOLCANO_MAP) - 1 - row_idx) * TILE_SIZE  # 0 in basso
+                rects.append(pygame.Rect(x, y, TILE_SIZE, TILE_SIZE))
+    return rects
+
+VOLCANO_COLLISION_RECTS = get_volcano_collision_rects()
+
+def build_volcano_platforms():
+    """Crea piattaforme orizzontali sulle superfici superiori dei blocchi 'x'
+    (solo dove sopra c'è aria 'o', così da avere sporgenze su cui saltare)."""
+    platforms = []
+    start_km = KM_PER_LEVEL[LEVEL_CROSTA]
+    start_px = start_km * PIXEL_PER_KM
+    # Stesso ancoraggio usato nel draw
+    map_top_world_y = (HEIGHT - VOLCANO_MAP_HEIGHT_PX) - start_px
+
+    rows = len(VOLCANO_MAP)
+    cols = len(VOLCANO_MAP[0])
+
+    for row_idx in range(rows):
+        row = VOLCANO_MAP[row_idx]
+        y_world = map_top_world_y + row_idx * TILE_SIZE
+        col = 0
+        while col < cols:
+            ch = row[col]
+            above_open = (row_idx == 0) or (VOLCANO_MAP[row_idx-1][col] == 'o')
+            if ch == 'x' and above_open:
+                start_col = col
+                # Estende finché restano 'x' con aria sopra
+                while col < cols and row[col] == 'x' and ((row_idx == 0) or (VOLCANO_MAP[row_idx-1][col] == 'o')):
+                    col += 1
+                width = (col - start_col) * TILE_SIZE
+                x_world = start_col * TILE_SIZE
+                platforms.append(pygame.Rect(x_world, y_world, width, 12))
+            else:
+                col += 1
+    return platforms
+
+VOLCANO_PLATFORMS = build_volcano_platforms()
+
+def draw_volcano_static(surface, world_offset):
+    """Disegna la sezione del vulcano basata sulla mappa statica ('x'/'o') allineata ai km di livello."""
+    start_km = KM_PER_LEVEL[LEVEL_CROSTA]
+    start_px = start_km * PIXEL_PER_KM
+
+    # Posizione mondo della riga superiore della mappa in modo che quando world_offset == start_px
+    # la mappa occupi esattamente lo schermo (top = 0)
+    map_top_world_y = (HEIGHT - VOLCANO_MAP_HEIGHT_PX) - start_px
+
+    # Disegno solo le righe visibili per performance
+    first_visible_row = max(0, int((0 - world_offset - map_top_world_y) // TILE_SIZE))
+    last_visible_row = min(len(VOLCANO_MAP)-1, int((HEIGHT - world_offset - map_top_world_y) // TILE_SIZE) + 1)
+
+    for row_idx in range(first_visible_row, last_visible_row + 1):
+        row = VOLCANO_MAP[row_idx]
+        y_world = map_top_world_y + row_idx * TILE_SIZE
+        y_screen = int(y_world + world_offset)
+        for col_idx, ch in enumerate(row):
+            if ch == 'x':
+                x_world = col_idx * TILE_SIZE
+                x_screen = int(x_world)
+                # Disegno blocco roccia
+                color = (90, 45, 10)
+                pygame.draw.rect(surface, color, (x_screen, y_screen, TILE_SIZE, TILE_SIZE))
+                pygame.draw.rect(surface, (120, 60, 15), (x_screen+2, y_screen+2, TILE_SIZE-4, TILE_SIZE-4), 1)
+
+def check_volcano_tile_collision(ball, world_offset):
+    """Collisione con i blocchi 'x' della mappa vulcano.
+    Ritorna (landed: bool, landing_y_world: float|None)"""
+    start_km = KM_PER_LEVEL[LEVEL_CROSTA]
+    start_px = start_km * PIXEL_PER_KM
+    map_top_world_y = (HEIGHT - VOLCANO_MAP_HEIGHT_PX) - start_px
+
+    landed = False
+    landing_y = None
+    margin = 8
+
+    # Determina righe e colonne della zona attorno al player
+    player_left = int((ball.x - ball.radius) // TILE_SIZE)
+    player_right = int((ball.x + ball.radius) // TILE_SIZE) + 1
+    player_world_y = ball.y
+    player_row = int((player_world_y - map_top_world_y) // TILE_SIZE)
+
+    row_start = max(0, player_row - 2)
+    row_end = min(len(VOLCANO_MAP)-1, player_row + 2)
+    col_start = max(0, player_left - 1)
+    col_end = min(len(VOLCANO_MAP[0])-1, player_right + 1)
+
+    for row_idx in range(row_start, row_end + 1):
+        row = VOLCANO_MAP[row_idx]
+        y_world = map_top_world_y + row_idx * TILE_SIZE
+        tile_top = y_world
+        tile_bottom = y_world + TILE_SIZE
+        for col_idx in range(col_start, col_end + 1):
+            if row[col_idx] != 'x':
+                continue
+            x_world = col_idx * TILE_SIZE
+            tile_left = x_world
+            tile_right = x_world + TILE_SIZE
+
+            # Check overlap in X
+            if (ball.x + ball.radius) > tile_left and (ball.x - ball.radius) < tile_right:
+                # Solo gestione atterraggio dall'alto
+                if ball.vy >= 0:
+                    ball_bottom = ball.y + ball.radius
+                    prev_bottom = (ball.y - ball.vy) + ball.radius
+                    if prev_bottom <= tile_top + margin and ball_bottom >= tile_top - margin:
+                        landing_y = tile_top
+                        landed = True
+    return landed, landing_y
+
 # ----------------- Volcano Top + Sky -----------------
 CRATER_Y = 100  # altezza del cratere
 eruption = False
 particles = []
+eruption_mode = False  # modalità eruzione/vittoria
+eruption_start_time = 0
+eruption_award_given = False
+eruption_world_offset = None
+crater_world_cache = None  # (left, right, top_world)
+
+def get_crater_world_info():
+    """Restituisce (crater_left, crater_right, crater_top_world) dalla mappa statica."""
+    start_km = KM_PER_LEVEL[LEVEL_CROSTA]
+    start_px = start_km * PIXEL_PER_KM
+    map_top_world_y = (HEIGHT - VOLCANO_MAP_HEIGHT_PX) - start_px
+    for row_idx, row in enumerate(VOLCANO_MAP):
+        if 'o' in row:
+            min_c = None
+            max_c = None
+            for col_idx, ch in enumerate(row):
+                if ch == 'o':
+                    if min_c is None:
+                        min_c = col_idx
+                    max_c = col_idx
+            if min_c is not None and max_c is not None:
+                crater_left = min_c * TILE_SIZE
+                crater_right = (max_c + 1) * TILE_SIZE
+                crater_top_world = map_top_world_y + row_idx * TILE_SIZE
+                return int(crater_left), int(crater_right), int(crater_top_world)
+    # Fallback
+    return WIDTH//3, WIDTH*2//3, 0
+
+def draw_lava_jet(center_x, crater_top_screen, t_ms):
+    """Disegna un getto centrale brillante per rappresentare la goccia trasformata."""
+    jet_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    wave = math.sin(t_ms * 0.004) * 0.2 + 0.8
+    jet_height = int(260 * wave)
+    base_width = int(40 * wave + 20)
+    for i in range(jet_height):
+        y = crater_top_screen - i
+        width = int(base_width * (1 - i / (jet_height + 1)) + 8)
+        alpha = max(0, 220 - int(i * 0.7))
+        color = (255, 140 + min(115, i // 2), 0, alpha)
+        pygame.draw.line(jet_surface, color, (center_x - width//2, y), (center_x + width//2, y))
+    # Bagliore alla base
+    glow = pygame.Surface((160, 80), pygame.SRCALPHA)
+    for r in range(70, 0, -10):
+        a = int(60 * (r / 70))
+        pygame.draw.ellipse(glow, (255, 80, 0, a), (80 - r, 40 - r//2, 2*r, r))
+    screen.blit(jet_surface, (0, 0))
+    screen.blit(glow, (center_x - 80, crater_top_screen - 30))
+eruption_mode = False  # quando True, la goccia diventa fontana di lava dal cratere
+
+def get_crater_info_from_static_map(world_offset):
+    """Restituisce (crater_left, crater_right, crater_top) in coordinate schermo
+    usando la prima riga dall'alto con 'o' (spazio aperto) come bordo del cratere."""
+    start_km = KM_PER_LEVEL[LEVEL_CROSTA]
+    start_px = start_km * PIXEL_PER_KM
+    map_top_world_y = (HEIGHT - VOLCANO_MAP_HEIGHT_PX) - start_px
+    # Cerca la prima riga con spazi aperti 'o' (dall'alto)
+    for row_idx, row in enumerate(VOLCANO_MAP):
+        if 'o' in row:
+            min_c = None
+            max_c = None
+            for col_idx, ch in enumerate(row):
+                if ch == 'o':
+                    if min_c is None:
+                        min_c = col_idx
+                    max_c = col_idx
+            if min_c is not None and max_c is not None:
+                crater_left = min_c * TILE_SIZE
+                crater_right = (max_c + 1) * TILE_SIZE
+                crater_top_world = map_top_world_y + row_idx * TILE_SIZE
+                crater_top_screen = int(crater_top_world + world_offset)
+                return int(crater_left), int(crater_right), int(crater_top_screen)
+    # Fallback: centro schermo
+    return WIDTH//3, WIDTH*2//3, HEIGHT//3
 
 # ----------------- Power-ups -----------------
 class PowerUp:
@@ -561,7 +859,7 @@ def add_environmental_effects(surface, level, world_offset):
             spark_surface = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
             color = (255, 255, random.randint(0, 100), random.randint(100, 255))
             pygame.draw.circle(spark_surface, color, (size, size), size)
-            surface.blit(sparkle_surface, (x-size, y-size))
+            surface.blit(spark_surface, (x-size, y-size))
 
 def draw_transition_effects(progress, from_level, to_level):
     # Effetti speciali durante le transizioni
@@ -810,7 +1108,7 @@ def create_static_platforms():
             enemy_type = random.choice(enemy_types)
             enemies.append(Enemy(x + platform_width + 50, y, enemy_type))
 
-        log_debug(f"Creata piattaforma a x={x}, y={y}, livello={level_names[level]}")
+        pass  # Rimosso debug generazione piattaforme
 
     # Piattaforma iniziale
     start_y = HEIGHT - 50
@@ -840,7 +1138,7 @@ def create_static_platforms():
 
         add_platform(x, current_y, level)
 
-    log_debug(f"Generate {len(platforms)} piattaforme, {len(powerups)} power-ups, {len(collectibles)} collectibles, {len(enemies)} nemici")
+    pass  # Rimosso debug generazione livello
     return platforms, platform_types, powerups, collectibles, enemies
 
 platforms, platform_types, powerups, collectibles, enemies = create_static_platforms()
@@ -1100,16 +1398,40 @@ def draw_leaderboard():
     screen.blit(back_text, (WIDTH//2 - back_text.get_width()//2, HEIGHT - 50))
 
 def draw_game_over():
+    # Crea un overlay scuro semi-trasparente che pulsa
     overlay = pygame.Surface((WIDTH, HEIGHT))
     overlay.fill((0, 0, 0))
-    overlay.set_alpha(128)
+    pulse = (math.sin(pygame.time.get_ticks() * 0.002) * 0.1 + 0.7)  # Varia tra 0.6 e 0.8
+    overlay.set_alpha(int(160 * pulse))  # L'overlay pulsa leggermente
     screen.blit(overlay, (0, 0))
 
+    # Testo "GAME OVER" con effetto glow rosso pulsante
+    glow_size = int(4 + math.sin(pygame.time.get_ticks() * 0.004) * 2)  # Varia tra 2 e 6
+    for offset in range(glow_size, 0, -1):
+        glow_color = (128, 0, 0, int(255 / offset))
+        game_over_text = TITLE_FONT.render("GAME OVER", True, glow_color)
+        pos_x = WIDTH//2 - game_over_text.get_width()//2
+        pos_y = HEIGHT//2 - 100
+        screen.blit(game_over_text, (pos_x - offset, pos_y))
+        screen.blit(game_over_text, (pos_x + offset, pos_y))
+        screen.blit(game_over_text, (pos_x, pos_y - offset))
+        screen.blit(game_over_text, (pos_x, pos_y + offset))
+    
+    # Testo principale "GAME OVER"
     game_over_text = TITLE_FONT.render("GAME OVER", True, (255, 0, 0))
     screen.blit(game_over_text, (WIDTH//2 - game_over_text.get_width()//2, HEIGHT//2 - 100))
 
+    # Punteggio finale
     final_score_text = FONT.render(f"Punteggio Finale: {score}", True, (255, 255, 255))
-    screen.blit(final_score_text, (WIDTH//2 - final_score_text.get_width()//2, HEIGHT//2 - 50))
+    screen.blit(final_score_text, (WIDTH//2 - final_score_text.get_width()//2, HEIGHT//2 - 20))
+
+    # Istruzioni per ricominciare/uscire con effetto pulsante
+    pulse_color = int(200 + math.sin(pygame.time.get_ticks() * 0.005) * 55)  # Varia tra 145 e 255
+    restart_text = FONT.render("Premi R per riprovare", True, (pulse_color, pulse_color, pulse_color))
+    screen.blit(restart_text, (WIDTH//2 - restart_text.get_width()//2, HEIGHT//2 + 40))
+    
+    quit_text = FONT.render("Premi ESC per tornare al menu", True, (180, 180, 180))
+    screen.blit(quit_text, (WIDTH//2 - quit_text.get_width()//2, HEIGHT//2 + 80))
 
     height_km = world_offset / PIXEL_PER_KM
     height_text = FONT.render(f"Altezza Raggiunta: {height_km:.2f} km", True, (255, 255, 255))
@@ -1184,17 +1506,29 @@ def check_platform_collision(ball, platforms, world_offset):
 
                 margin = 8
                 if prev_bottom <= plat_rect.top + margin and ball_bottom >= plat_rect.top - margin:
-                    log_debug(f"Collisione con piattaforma {i} - Tipo: {platform_types[i]} - plat_top(screen)={plat_rect.top:.1f}")
+                    # Rimosso debug collisioni
                     return True, i
 
     return False, None
 
 def reset_game():
-    global player, world_offset, score, GAME_OVER, tiles_revealed, platforms, platform_types, current_level
-    global powerups, collectibles, enemies
+    global player, world_offset, score, is_game_over, tiles_revealed, platforms, platform_types, current_level
+    global powerups, collectibles, enemies, game_state
+    global eruption_mode
 
+    # Reset completo delle variabili di gioco
+    world_offset = 0
+    score = 0
+    is_game_over = False
+    game_state = PLAYING
+    eruption_mode = False
+    tiles_revealed = 1
+    current_level = LEVEL_MANTELLO
+
+    # Ricrea tutte le piattaforme
     platforms, platform_types, powerups, collectibles, enemies = create_static_platforms()
 
+    # Reset completo del player
     start_platform = platforms[0]
     player.x = start_platform.centerx
     player.y = start_platform.top - player.radius
@@ -1207,13 +1541,13 @@ def reset_game():
     player.active_powerups.clear()
     player.invulnerable_time = 0
 
-    world_offset = 0
-    score = 0
-    GAME_OVER = False
-    tiles_revealed = 1
-    current_level = LEVEL_MANTELLO
+    # Effetto sonoro di reset
+    try:
+        audio.play('reset')
+    except:
+        pass
 
-    log_debug(f"Gioco resettato - Player posizionato a x={player.x}, y={player.y}")
+    log_game_event("🔄 Nuova partita iniziata!")
 
 # ----------------- Main Game Loop -----------------
 start_platform = platforms[0]
@@ -1221,14 +1555,15 @@ player = WobblyBall(start_platform.centerx, start_platform.top - 32)
 world_offset = 0.0
 t_global = 0.0
 score = 0
-GAME_OVER = False
+is_game_over = False
 tiles_revealed = 1
 jumps_made = 0
 current_level = LEVEL_MANTELLO
 
 def main():
-    global t_global, world_offset, score, GAME_OVER, tiles_revealed, jumps_made, current_level
+    global t_global, world_offset, score, is_game_over, tiles_revealed, jumps_made, current_level
     global game_state, player_name, high_scores
+    global eruption_mode
 
     menu_selected = 0
     running = True
@@ -1242,6 +1577,7 @@ def main():
                 running = False
 
             elif ev.type == pygame.KEYDOWN:
+                debug_input_event(ev, "KEYDOWN")
                 if game_state == MENU:
                     if ev.key == pygame.K_UP:
                         menu_selected = (menu_selected - 1) % 3
@@ -1249,11 +1585,14 @@ def main():
                         menu_selected = (menu_selected + 1) % 3
                     elif ev.key == pygame.K_RETURN:
                         if menu_selected == 0:  # GIOCA
+                            log_game_event("🎮 Inizia nuova partita")
                             game_state = PLAYING
                             reset_game()
                         elif menu_selected == 1:  # CLASSIFICA
+                            log_game_event("🏆 Visualizzazione classifica")
                             game_state = LEADERBOARD
                         elif menu_selected == 2:  # ESCI
+                            log_game_event("👋 Uscita dal gioco")
                             running = False
 
                 elif game_state == PLAYING:
@@ -1264,36 +1603,49 @@ def main():
                         else:
                             player.vy = -10
 
-                elif game_state == GAME_OVER:
-                    if ev.key == pygame.K_r:
-                        game_state = PLAYING
-                        reset_game()
-                    elif ev.key == pygame.K_ESCAPE:
-                        game_state = MENU
+                        # Gestiamo il Game Over sia dallo stato che dal flag is_game_over
+            
+                    elif game_state == GAME_OVER or (is_game_over and game_state == PLAYING):
+                        if ev.key == pygame.K_r:
+                            log_game_event("🔄 Riavvio partita...")
+                            reset_game()  # reset_game si occuperà di impostare sia game_state che GAME_OVER
+                        elif ev.key == pygame.K_ESCAPE:
+                            log_game_event("🏠 Ritorno al menu principale")
+                            game_state = MENU
+                            is_game_over = False  # Resettiamo anche il flag quando torniamo al menu
 
-                elif game_state == LEADERBOARD:
-                    if ev.key == pygame.K_ESCAPE:
-                        game_state = MENU
+                    elif game_state == LEADERBOARD:
+                        if ev.key == pygame.K_ESCAPE:
+                            game_state = MENU
 
-                elif game_state == ENTER_NAME:
-                    if ev.key == pygame.K_RETURN:
-                        height_km = world_offset / PIXEL_PER_KM
-                        high_scores = save_score(player_name, score, height_km)
-                        player_name = ""
-                        game_state = LEADERBOARD
-                    elif ev.key == pygame.K_BACKSPACE:
-                        player_name = player_name[:-1]
-                    else:
-                        if len(player_name) < 10 and ev.unicode.isprintable():
-                            player_name += ev.unicode
+                    elif game_state == ENTER_NAME:
+                        if ev.key == pygame.K_RETURN:
+                            height_km = world_offset / PIXEL_PER_KM
+                            high_scores = save_score(player_name, score, height_km)
+                            player_name = ""
+                            game_state = LEADERBOARD
+                        elif ev.key == pygame.K_BACKSPACE:
+                            player_name = player_name[:-1]
+                        else:
+                            if len(player_name) < 10 and ev.unicode.isprintable():
+                                player_name += ev.unicode
+
+            elif ev.type == pygame.KEYUP:
+                debug_input_event(ev, "KEYUP")
 
         # Store menu selection for drawing
         draw_menu.selected = menu_selected
 
         if game_state == PLAYING:
             keys = pygame.key.get_pressed()
-            player.apply_input(keys)
-            player.update_physics(dt)
+            if eruption_mode:
+                if eruption_world_offset is not None:
+                    world_offset = eruption_world_offset
+                player.vx = 0
+                player.vy = 0
+            else:
+                player.apply_input(keys)
+                player.update_physics(dt)
 
             # Update game objects
             for powerup in powerups:
@@ -1317,13 +1669,15 @@ def main():
                 if enemy.check_collision(player):
                     if player.take_damage():
                         if player.health <= 0:
-                            GAME_OVER = True
+                            is_game_over = True
+                            game_state = GAME_OVER
+                            log_game_event("❌ GAME OVER - Salute esaurita!")
 
             # SCROLL
             SCROLL_THRESH = HEIGHT * 0.4
             SCROLL_SPEED = 0.3
 
-            if player.y < SCROLL_THRESH:
+            if not eruption_mode and player.y < SCROLL_THRESH:
                 target_dy = SCROLL_THRESH - player.y
                 actual_dy = target_dy * SCROLL_SPEED
                 max_scroll = 15
@@ -1334,7 +1688,7 @@ def main():
                 score += int(actual_dy * 0.2)
 
                 km_height = world_offset / PIXEL_PER_KM
-                log_debug(f"Scroll - km: {km_height:.2f}, world_offset: {world_offset:.1f}")
+                pass  # Rimosso debug scroll
 
                 # Update level
                 if km_height >= KM_PER_LEVEL[LEVEL_CROSTA]:
@@ -1348,16 +1702,61 @@ def main():
                 else:
                     current_level = LEVEL_MANTELLO
 
-                if km_height >= KM_PER_LEVEL[LEVEL_VULCANO]:
-                    GAME_OVER = True
-                    score += 10000
-                    audio.play('eruption')
+                # Eruzione continua quando raggiungi la cima della mappa del vulcano
+                vulcano_start_px = KM_PER_LEVEL[LEVEL_CROSTA] * PIXEL_PER_KM
+                vulcano_end_px = vulcano_start_px + VOLCANO_MAP_HEIGHT_PX
+                if not eruption_mode and world_offset >= (vulcano_end_px - HEIGHT * 0.6):
+                    eruption_mode = True
+                    eruption_start_time = pygame.time.get_ticks()
+                    eruption_award_given = False
+                    # Blocca la camera sul cratere: calcola world_offset da fissare
+                    c_left, c_right, c_top_world = get_crater_world_info()
+                    eruption_world_offset = (HEIGHT * 0.45) - c_top_world
 
-            # Collision with platforms
-            grounded, idx = check_platform_collision(player, platforms, world_offset)
+            km_height = world_offset / PIXEL_PER_KM
+            # Collisioni
+            grounded, idx = (False, None)
+            landing_source = None  # 'base', 'volcano_surface', 'volcano_dynamic', or None
+            if km_height < KM_PER_LEVEL[LEVEL_CROSTA]:
+                grounded, idx = check_platform_collision(player, platforms, world_offset)
+                if grounded:
+                    landing_source = 'base'
+            else:
+                # 1) Piattaforme di superficie del vulcano (derivate dalla mappa)
+                grounded, idx = check_platform_collision(player, VOLCANO_PLATFORMS, world_offset)
+                if grounded:
+                    landing_source = 'volcano_surface'
+                else:
+                    # 2) Piattaforme dinamiche nella sezione vulcano
+                    volcano_dyn_plats = [platforms[i] for i, t in enumerate(platform_types) if t == LEVEL_VULCANO]
+                    grounded, idx = check_platform_collision(player, volcano_dyn_plats, world_offset)
+                    if grounded:
+                        landing_source = 'volcano_dynamic'
+                    else:
+                        # 3) Fallback: collisione diretta coi tile top
+                        landed_tmp, _ = check_volcano_tile_collision(player, world_offset)
+                        if landed_tmp:
+                            grounded = True
+                            landing_source = None
             if grounded and player.vy >= 0:
-                plat = platforms[idx]
-                player.y = plat.top + world_offset - player.radius
+                # Se proviene da piattaforme
+                if idx is not None and landing_source is not None:
+                    if landing_source == 'base':
+                        plat = platforms[idx]
+                    elif landing_source == 'volcano_surface':
+                        plat = VOLCANO_PLATFORMS[idx]
+                    elif landing_source == 'volcano_dynamic':
+                        volcano_dyn_plats = [platforms[i] for i, t in enumerate(platform_types) if t == LEVEL_VULCANO]
+                        plat = volcano_dyn_plats[idx]
+                    else:
+                        plat = None
+                    if plat is not None:
+                        player.y = plat.top + world_offset - player.radius
+                else:
+                    # Controllo collisione tile vulcano per ottenere la Y di atterraggio
+                    landed, landing_y = check_volcano_tile_collision(player, world_offset)
+                    if landed and landing_y is not None:
+                        player.y = landing_y - player.radius
                 player.jump()
 
                 # Particle effect
@@ -1369,12 +1768,16 @@ def main():
                     for _ in range(5)
                 ])
 
-            # Game over condition
-            if player.y - player.radius > HEIGHT + 200:
-                GAME_OVER = True
-
+                # Game over condition - se la goccia esce dalla visuale
+            screen_y = player.y - world_offset  # Calcoliamo la posizione sullo schermo
+            if not eruption_mode and screen_y > HEIGHT + 50 and not is_game_over:  # Ridotto da 200 a 50 per un game over più reattivo
+                is_game_over = True
+                game_state = GAME_OVER
+                log_game_event("❌ GAME OVER - La goccia è caduta nel vuoto!")
+                # Aggiungiamo un messaggio per i controlli
+                log_game_event("🎮 Premi R per riprovare o ESC per tornare al menu")
             # Check for high score
-            if GAME_OVER and score > 0:
+            if is_game_over and score > 0:
                 is_high_score = False
                 if not high_scores or score > high_scores[0]['score']:
                     is_high_score = True
@@ -1395,20 +1798,44 @@ def main():
             # Game rendering
             screen.fill((0,0,0))
             draw_enhanced_background(world_offset)
+            # Disegna la mappa statica del vulcano sopra al background quando siamo nel vulcano
+            height_km = world_offset / PIXEL_PER_KM
+            if height_km >= KM_PER_LEVEL[LEVEL_CROSTA]:
+                draw_volcano_static(screen, world_offset)
+                # Se in eruzione, disegna fontana di lava continua dal cratere e colate sui fianchi
+                if eruption_mode:
+                    crater_info = get_crater_info_from_static_map(world_offset)
+                    draw_eruption_effects(crater_info, height_km)
 
-            # Draw platforms
-            for i, plat in enumerate(platforms):
-                rect = plat.copy()
-                rect.y += world_offset
-                if -50 < rect.y < HEIGHT + 50:
-                    plat_height_km = (plat.y + world_offset) / PIXEL_PER_KM
-                    if plat_height_km >= KM_PER_LEVEL[LEVEL_CROSTA]:
-                        color = (169, 169, 169)
-                    elif plat_height_km >= KM_PER_LEVEL[LEVEL_MANTELLO]:
-                        color = (139, 69, 19)
-                    else:
-                        color = (255, 100, 0)
-                    pygame.draw.rect(screen, color, rect)
+            # Draw platforms (fino alla crosta) e nel vulcano disegna sia superfici che piattaforme dinamiche
+            if (world_offset / PIXEL_PER_KM) < KM_PER_LEVEL[LEVEL_CROSTA]:
+                for i, plat in enumerate(platforms):
+                    rect = plat.copy()
+                    rect.y += world_offset
+                    if -50 < rect.y < HEIGHT + 50:
+                        plat_height_km = (plat.y + world_offset) / PIXEL_PER_KM
+                        if plat_height_km >= KM_PER_LEVEL[LEVEL_CROSTA]:
+                            color = (169, 169, 169)
+                        elif plat_height_km >= KM_PER_LEVEL[LEVEL_MANTELLO]:
+                            color = (139, 69, 19)
+                        else:
+                            color = (255, 100, 0)
+                        pygame.draw.rect(screen, color, rect)
+            else:
+                # Piattaforme di superficie nel vulcano
+                for plat in VOLCANO_PLATFORMS:
+                    rect = plat.copy()
+                    rect.y += world_offset
+                    if -50 < rect.y < HEIGHT + 50:
+                        pygame.draw.rect(screen, (110, 55, 20), rect)
+                # Piattaforme dinamiche nel vulcano
+                for i, plat in enumerate(platforms):
+                    if platform_types[i] != LEVEL_VULCANO:
+                        continue
+                    rect = plat.copy()
+                    rect.y += world_offset
+                    if -50 < rect.y < HEIGHT + 50:
+                        pygame.draw.rect(screen, (169, 169, 169), rect)
 
             # Draw power-ups
             for powerup in powerups:
@@ -1418,14 +1845,16 @@ def main():
             for collectible in collectibles:
                 collectible.draw(screen, world_offset)
 
-            # Draw enemies
-            for enemy in enemies:
-                enemy.draw(screen, world_offset)
+            # Draw enemies (evita durante eruzione per pulizia visiva)
+            if not eruption_mode:
+                for enemy in enemies:
+                    enemy.draw(screen, world_offset)
 
-            # Draw player
-            player.draw_trail(screen)
-            player.draw_particles(screen)
-            player.draw_wobbly(screen, t_global)
+            # Draw player: durante eruzione, la goccia è rappresentata dal getto centrale
+            if not eruption_mode:
+                player.draw_trail(screen)
+                player.draw_particles(screen)
+                player.draw_wobbly(screen, t_global)
 
             # Draw HUD
             draw_hud()
@@ -1433,6 +1862,23 @@ def main():
             if game_state == GAME_OVER:
                 draw_game_over()
 
+            # Overlay eruzione: fontana al cratere e premio/leaderboard
+            if height_km >= KM_PER_LEVEL[LEVEL_CROSTA] and eruption_mode:
+                c_left, c_right, c_top_world = get_crater_world_info()
+                crater_top_screen = int(c_top_world + world_offset)
+                crater_info = (int(c_left), int(c_right), crater_top_screen)
+                draw_eruption_effects(crater_info, height_km)
+                center_x = (c_left + c_right) // 2
+                draw_lava_jet(center_x, crater_top_screen, pygame.time.get_ticks())
+                # Premio e transizione dopo 4s
+                if not eruption_award_given:
+                    score += 20000
+                    eruption_award_given = True
+                    log_game_event("🏔️ Cima raggiunta! Bonus +20000")
+                if pygame.time.get_ticks() - eruption_start_time > 4000:
+                    game_state = LEADERBOARD
+
+        # Aggiorna lo schermo ad ogni frame
         pygame.display.flip()
 
     pygame.quit()
