@@ -2431,3 +2431,24 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def get_cone_walls_at_y(y_screen, base_width_px=540, top_width_px=120, cone_start_y=0, cone_end_y=1600, screen_width=600):
+    """
+    Restituisce (x_sinistra, x_destra) delle pareti del cono a una certa y_screen.
+    - y_screen: coordinata verticale (in pixel, rispetto allo schermo o world_offset)
+    - base_width_px: larghezza del cono alla base (in pixel)
+    - top_width_px: larghezza del cratere in cima (in pixel)
+    - cone_start_y: y di inizio transizione cono (in pixel, world_offset)
+    - cone_end_y: y di fine transizione (in pixel, world_offset)
+    - screen_width: larghezza schermo (in pixel)
+    """
+    if y_screen < cone_start_y:
+        width = base_width_px
+    elif y_screen > cone_end_y:
+        width = top_width_px
+    else:
+        t = (y_screen - cone_start_y) / (cone_end_y - cone_start_y)
+        width = base_width_px * (1-t) + top_width_px * t
+    x_left = (screen_width - width) // 2
+    x_right = x_left + width
+    return int(x_left), int(x_right)
