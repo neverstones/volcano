@@ -120,10 +120,17 @@ PLAYING = 1
 GAME_OVER = 2
 LEADERBOARD = 3
 ENTER_NAME = 4
+VICTORY_FOUNTAIN = 5  # Nuovo stato per l'effetto fontana
+VICTORY_SCREEN = 6   # Nuovo stato per la schermata di vittoria
 
 game_state = MENU
 player_name = ""
 high_scores = load_scores()
+
+# Variabili per l'effetto fontana
+fountain_start_time = 0
+fountain_particles = []
+victory_achieved = False
 
 # Debug input: abilita/disabilita log dei tasti premuti
 ENABLE_INPUT_DEBUG = True
@@ -1190,7 +1197,65 @@ def draw_transition_effects(progress, from_level, to_level):
             screen.blit(effect_surface, (x-size, y-size))
 
     elif from_level == LEVEL_CROSTA and to_level == LEVEL_VULCANO:
-        # Effetto di ingresso nel vulcano conico con crepe che si allargano
+        # Effetto nastro trasportatore + ingresso nel vulcano conico con crepe che si allargano
+        
+        # 1. EFFETTO NASTRO TRASPORTATORE
+        # Linee orizzontali che si muovono verso il centro per simulare l'ingresso nel vulcano
+        conveyor_lines = 8
+        current_time = pygame.time.get_ticks()
+        
+        for i in range(conveyor_lines):
+            # Calcola la posizione Y di ogni linea
+            line_spacing = HEIGHT // conveyor_lines
+            base_y = i * line_spacing + (current_time * 0.05) % line_spacing
+            
+            # Intensità dell'effetto basata sul progresso
+            alpha = int(150 * progress)
+            color = (100, 100, 100, alpha)
+            
+            # Linee che convergono verso il centro (simulano l'ingresso nel vulcano)
+            convergence_factor = progress * 0.3  # Quanto le linee convergono verso il centro
+            
+            # Lato sinistro - linee che si muovono verso destra/centro
+            left_start = 0
+            left_end = int(WIDTH * 0.4 + (WIDTH * 0.1 * convergence_factor))
+            
+            # Lato destro - linee che si muovono verso sinistra/centro  
+            right_start = int(WIDTH * 0.6 - (WIDTH * 0.1 * convergence_factor))
+            right_end = WIDTH
+            
+            # Disegna le linee del nastro trasportatore
+            belt_surface = pygame.Surface((WIDTH, 4), pygame.SRCALPHA)
+            pygame.draw.line(belt_surface, color, (left_start, 2), (left_end, 2), 2)
+            pygame.draw.line(belt_surface, color, (right_start, 2), (right_end, 2), 2)
+            screen.blit(belt_surface, (0, base_y))
+            
+            # Aggiunge piccole frecce per indicare la direzione
+            if i % 2 == 0 and progress > 0.3:
+                arrow_color = (150, 150, 0, alpha)
+                arrow_y = base_y + 2
+                
+                # Frecce verso destra sul lato sinistro
+                for arrow_x in range(50, left_end, 80):
+                    arrow_x += int((current_time * 0.1) % 80)
+                    if arrow_x < left_end - 20:
+                        pygame.draw.polygon(screen, arrow_color, [
+                            (arrow_x, arrow_y), 
+                            (arrow_x + 15, arrow_y - 3), 
+                            (arrow_x + 15, arrow_y + 3)
+                        ])
+                
+                # Frecce verso sinistra sul lato destro  
+                for arrow_x in range(right_start + 50, WIDTH - 20, 80):
+                    arrow_x -= int((current_time * 0.1) % 80)
+                    if arrow_x > right_start + 20:
+                        pygame.draw.polygon(screen, arrow_color, [
+                            (arrow_x, arrow_y), 
+                            (arrow_x - 15, arrow_y - 3), 
+                            (arrow_x - 15, arrow_y + 3)
+                        ])
+        
+        # 2. EFFETTI DI INGRESSO NEL VULCANO (codice esistente)
         num_cracks = int(15 * progress)
         
         # Calcola la larghezza del passaggio durante la transizione
@@ -1253,31 +1318,294 @@ def draw_transition_effects(progress, from_level, to_level):
             pygame.draw.circle(screen, trail_color, (x, y - 3), size // 2)
 
 def draw_volcano_section(alpha, world_offset, km_height):
-    # Sezione vulcano con pareti coniche e effetti
-    screen.fill((20, 10, 5))  # Sfondo scuro vulcanico
+    # Dichiara global all'inizio
+    global screen
     
-    # Disegna le pareti coniche del vulcano
-    draw_conical_volcano_walls(world_offset, km_height)
+    # Sezione vulcano con zoom fisso e effetto nastro trasportatore
     
-    # Effetti di eruzione se vicini al cratere
-    if km_height > KM_PER_LEVEL[LEVEL_VULCANO] * 0.9:
-        crater_info = get_crater_info_from_static_map(world_offset)
-        draw_eruption_effects(crater_info, km_height)
-
-def draw_conical_volcano_walls(world_offset, km_height):
-    """Disegna pareti coniche del vulcano che si restringono verso l'alto - VERSIONE STABILE"""
-    # Prima riempie tutto lo schermo con il cielo esterno
-    draw_external_sky_background()
-    
-    # Calcola la progressione nel vulcano (0 = base, 1 = cratere)
+    # Calcola il progresso nel vulcano per l'effetto scorrimento
     volcano_start_km = KM_PER_LEVEL[LEVEL_CROSTA]
     volcano_end_km = KM_PER_LEVEL[LEVEL_VULCANO]
     volcano_progress = (km_height - volcano_start_km) / (volcano_end_km - volcano_start_km)
     volcano_progress = max(0, min(1, volcano_progress))
     
-    # Parametri per la forma conica - ANGOLO PIÙ STRETTO
-    base_width = WIDTH * 0.65      # Larghezza alla base (65% dello schermo)
-    crater_width = WIDTH * 0.15    # Larghezza al cratere (15% dello schermo)
+    # Zoom fisso a 1.4x per tutto il livello vulcano
+    zoom_factor = 1.4
+    
+    # Disegna le pareti del vulcano normalmente (senza modificare world_offset)
+    draw_volcano_tile_walls(world_offset, km_height)
+    
+    # Effetti di eruzione se vicini al cratere
+    if km_height > KM_PER_LEVEL[LEVEL_VULCANO] * 0.9:
+        crater_info = get_crater_info_from_static_map(world_offset)
+        draw_eruption_effects(crater_info, km_height)
+    
+    # Applica lo zoom fisso come post-effetto (senza conveyor factor)
+    # Cattura lo schermo corrente
+    current_surface = screen.copy()
+    
+    # Calcola le dimensioni zoom
+    zoom_width = int(WIDTH * zoom_factor)
+    zoom_height = int(HEIGHT * zoom_factor)
+    
+    # Scala la superficie mantenendo il centro
+    scaled_surface = pygame.transform.scale(current_surface, (zoom_width, zoom_height))
+    
+    # Calcola offset per centrare (senza scorrimento aggiuntivo)
+    center_offset_x = (zoom_width - WIDTH) // 2
+    center_offset_y = (zoom_height - HEIGHT) // 2
+    
+    # Riempie lo schermo di nero prima di applicare il zoom
+    screen.fill((20, 10, 5))
+    
+    # Ritaglia dal centro della superficie ingrandita
+    if (center_offset_x >= 0 and center_offset_y >= 0 and 
+        center_offset_x + WIDTH <= zoom_width and 
+        center_offset_y + HEIGHT <= zoom_height):
+        try:
+            center_rect = pygame.Rect(center_offset_x, center_offset_y, WIDTH, HEIGHT)
+            final_surface = scaled_surface.subsurface(center_rect)
+            screen.blit(final_surface, (0, 0))
+        except:
+            # Fallback senza zoom se ci sono errori
+            screen.blit(current_surface, (0, 0))
+    else:
+        # Fallback se gli offset sono fuori dai limiti
+        screen.blit(current_surface, (0, 0))
+
+def draw_volcano_tile_walls(world_offset, km_height):
+    """Disegna pareti del vulcano usando tile PNG che si restringono gradualmente verso il cratere"""
+    
+    # Prima riempie tutto lo schermo con il cielo esterno
+    draw_external_sky_background()
+    
+    # Calcola la progressione nel vulcano (sistema originale)
+    volcano_start_km = KM_PER_LEVEL[LEVEL_CROSTA]
+    volcano_end_km = KM_PER_LEVEL[LEVEL_VULCANO]
+    volcano_progress = (km_height - volcano_start_km) / (volcano_end_km - volcano_start_km)
+    volcano_progress = max(0, min(1, volcano_progress))
+    
+    # Calcola l'offset Y per l'effetto nastro trasportatore
+    # Direzione corretta: quando si sale, la mappa scorre verso il basso
+    # Velocità aumentata per effetto più visibile
+    conveyor_offset = int((km_height - volcano_start_km) * 3)  # 3 pixel per km (più veloce)
+    
+    # Disegna background shardRock fisso nell'area interna (ripristinato)
+    if 'shard_rock' in volcano_wall_tiles:
+        # Calcola l'area interna del vulcano
+        base_wall_distance = WIDTH - 100
+        max_inner_width = base_wall_distance
+        max_inner_left = (WIDTH - max_inner_width) / 2
+        
+        # Background fisso senza offset (come richiesto originariamente)
+        shard_background = pygame.transform.scale(volcano_wall_tiles['shard_rock'], (int(max_inner_width), HEIGHT))
+        screen.blit(shard_background, (max_inner_left, 0))
+        
+        # Background con offset Y per effetto nastro trasportatore
+        shard_background = pygame.transform.scale(volcano_wall_tiles['shard_rock'], (int(max_inner_width), HEIGHT))
+        screen.blit(shard_background, (max_inner_left, -conveyor_offset % HEIGHT))
+    
+    # Parametri delle pareti che si restringono (in pixel)
+    base_wall_distance = WIDTH - 100  # Distanza tra pareti alla base (larga)
+    crater_wall_distance = 4         # Distanza tra pareti al cratere (4 pixel per vittoria)
+    tile_size = 32
+    
+    # Calcola quante righe di tile disegnare per le pareti (sistema originale)
+    num_tile_rows = HEIGHT // tile_size + 1
+    
+    for row in range(num_tile_rows):
+        # Altezza di questa riga di tile (0 = basso, 1 = alto)
+        row_height_ratio = row / num_tile_rows
+        
+        # Calcola la distanza tra le pareti a questa altezza
+        current_wall_distance = base_wall_distance - (base_wall_distance - crater_wall_distance) * row_height_ratio
+        
+        # Posizione delle pareti (centrate sullo schermo)
+        left_wall_x = (WIDTH - current_wall_distance) / 2
+        right_wall_x = left_wall_x + current_wall_distance
+        
+        # Posizione Y di questa riga con offset nastro trasportatore
+        y = HEIGHT - (row + 1) * tile_size - (conveyor_offset % (tile_size * 4))
+        
+        # Determina il tipo di tile da usare in base all'altezza
+        if row_height_ratio < 0.3:
+            tile_type = 'ground'  # Base: terra/roccia
+        elif row_height_ratio < 0.7:
+            tile_type = 'stone'   # Medio: pietra normale
+        else:
+            tile_type = 'stone_wall'  # Alto: muri di pietra verso il cratere
+            
+        # Se siamo molto vicini al cratere (ultimi 5%), usa tile lava per effetto calore
+        if row_height_ratio > 0.95:
+            tile_type = 'lava'
+        
+        # Disegna i tile della parete sinistra con controllo visibilità
+        num_left_tiles = max(1, int(left_wall_x / tile_size))
+        for tile_x in range(num_left_tiles):
+            x = tile_x * tile_size
+            if x < left_wall_x and y > -tile_size and y < HEIGHT:  # Solo se visibile
+                screen.blit(volcano_wall_tiles[tile_type], (x, y))
+        
+        # Disegna i tile della parete destra con controllo visibilità
+        start_right_x = int(right_wall_x / tile_size) * tile_size
+        num_right_tiles = (WIDTH - start_right_x) // tile_size + 1
+        for tile_x in range(num_right_tiles):
+            x = start_right_x + tile_x * tile_size
+            if x >= right_wall_x and x < WIDTH and y > -tile_size and y < HEIGHT:  # Solo se visibile
+                screen.blit(volcano_wall_tiles[tile_type], (x, y))
+    
+    # Disegna indicatore del cratere quando è abbastanza stretto (sistema originale)
+    if num_tile_rows > 0:  # Evita divisione per zero
+        current_wall_distance = base_wall_distance - (base_wall_distance - crater_wall_distance) * (num_tile_rows-1) / num_tile_rows
+    else:
+        current_wall_distance = base_wall_distance
+        
+    if current_wall_distance <= 10:  # Quando siamo vicini ai 4 pixel
+        crater_y = 50  # Posizione del cratere fissa (sistema originale)
+        crater_center = WIDTH // 2
+        
+        # Effetto bagliore del cratere
+        crater_glow = pygame.Surface((20, 40), pygame.SRCALPHA)
+        for r in range(10, 0, -2):
+            alpha = int(100 * (r / 10))
+            glow_color = (255, 150, 0, alpha)
+            pygame.draw.ellipse(crater_glow, glow_color, (10-r, 20-r, r*2, r*2))
+        screen.blit(crater_glow, (crater_center - 10, crater_y - 20))
+        
+        # Testo di avviso cratere
+        if hasattr(pygame.font, 'Font'):
+            try:
+                font = pygame.font.Font(None, 24)
+                crater_text = font.render("CRATERE!", True, (255, 255, 0))
+                text_rect = crater_text.get_rect(center=(crater_center, crater_y - 40))
+                screen.blit(crater_text, text_rect)
+            except:
+                pass
+
+def check_crater_victory(player, y_offset):
+    """Controlla se il giocatore ha raggiunto il cratere di 4 pixel per la vittoria"""
+    global game_state, fountain_start_time, fountain_particles, victory_achieved
+    
+    # Controlla se siamo nella sezione vulcano
+    start_km = KM_PER_LEVEL[LEVEL_CROSTA] 
+    player_km = (player.y - y_offset) / PIXEL_PER_KM
+    
+    if player_km < start_km:
+        return False
+        
+    # Calcola la distanza attuale tra le pareti
+    volcano_start_km = KM_PER_LEVEL[LEVEL_CROSTA]
+    volcano_end_km = KM_PER_LEVEL[LEVEL_VULCANO]
+    volcano_progress = (player_km - volcano_start_km) / (volcano_end_km - volcano_start_km)
+    volcano_progress = max(0, min(1, volcano_progress))
+    
+    base_wall_distance = WIDTH - 100
+    crater_wall_distance = 4
+    current_wall_distance = base_wall_distance - (base_wall_distance - crater_wall_distance) * volcano_progress
+    
+    # Il giocatore ha vinto se:
+    # 1. La distanza tra pareti è <= 4 pixel (cratere raggiunto)
+    # 2. Il giocatore è nella zona del cratere (centrato)
+    crater_reached = current_wall_distance <= 4
+    
+    if crater_reached and not victory_achieved:
+        crater_center = WIDTH // 2
+        player_in_crater = abs(player.x - crater_center) <= 10  # Tolleranza di 10 pixel
+        
+        if player_in_crater:
+            # Attiva l'effetto fontana
+            victory_achieved = True
+            game_state = VICTORY_FOUNTAIN
+            fountain_start_time = pygame.time.get_ticks()
+            
+            # Crea particelle per l'effetto fontana
+            fountain_particles.clear()
+            for i in range(50):  # 50 particelle
+                particle = {
+                    'x': player.x + random.randint(-10, 10),
+                    'y': player.y,
+                    'vx': random.uniform(-3, 3),
+                    'vy': random.uniform(-8, -15),  # Velocità verso l'alto
+                    'color': (255, random.randint(100, 255), random.randint(0, 100)),
+                    'life': 100
+                }
+                fountain_particles.append(particle)
+            
+            return True
+    
+    return False
+
+def update_fountain_effect():
+    """Aggiorna le particelle dell'effetto fontana"""
+    global fountain_particles, game_state, fountain_start_time
+    
+    # Aggiorna ogni particella
+    for particle in fountain_particles[:]:  # Copia della lista per rimozione sicura
+        particle['x'] += particle['vx']
+        particle['y'] += particle['vy']
+        particle['vy'] += 0.3  # Gravità
+        particle['life'] -= 2
+        
+        # Rimuovi particelle morte
+        if particle['life'] <= 0:
+            fountain_particles.remove(particle)
+    
+    # Aggiungi nuove particelle continuamente
+    if len(fountain_particles) < 30:
+        for i in range(5):
+            particle = {
+                'x': WIDTH // 2 + random.randint(-15, 15),
+                'y': HEIGHT // 2 + random.randint(-10, 10),
+                'vx': random.uniform(-2, 2),
+                'vy': random.uniform(-10, -18),
+                'color': (255, random.randint(150, 255), random.randint(50, 150)),
+                'life': 80
+            }
+            fountain_particles.append(particle)
+    
+    # Dopo 5 secondi, passa alla schermata di vittoria
+    current_time = pygame.time.get_ticks()
+    if current_time - fountain_start_time > 5000:  # 5 secondi
+        game_state = VICTORY_SCREEN
+
+def draw_fountain_effect():
+    """Disegna l'effetto fontana"""
+    for particle in fountain_particles:
+        alpha = int((particle['life'] / 100) * 255)
+        color = (*particle['color'], alpha)
+        
+        # Crea una superficie temporanea per l'alpha
+        surf = pygame.Surface((6, 6), pygame.SRCALPHA)
+        pygame.draw.circle(surf, color, (3, 3), 3)
+        screen.blit(surf, (int(particle['x']), int(particle['y'])))
+
+def draw_victory_screen():
+    """Disegna la schermata di vittoria con inserimento nome"""
+    global player_name
+    
+    screen.fill((50, 20, 20))
+    
+    # Titolo vittoria
+    title = TITLE_FONT.render("VITTORIA!", True, (255, 215, 0))
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 100))
+    
+    # Sottotitolo
+    subtitle = FONT.render("Hai raggiunto il cratere del vulcano!", True, (255, 255, 255))
+    screen.blit(subtitle, (WIDTH//2 - subtitle.get_width()//2, 180))
+    
+    # Campo inserimento nome
+    name_prompt = FONT.render("Inserisci il tuo nome:", True, (255, 255, 255))
+    screen.blit(name_prompt, (WIDTH//2 - name_prompt.get_width()//2, 250))
+    
+    # Nome inserito
+    name_display = FONT.render(player_name + "_", True, (255, 255, 0))
+    screen.blit(name_display, (WIDTH//2 - name_display.get_width()//2, 290))
+    
+    # Istruzioni
+    instruction = SMALL_FONT.render("Premi INVIO per salvare il punteggio", True, (200, 200, 200))
+    screen.blit(instruction, (WIDTH//2 - instruction.get_width()//2, 350))
+
+# ----------------- Enhanced Environment -----------------
     
     # Numero di sezioni per disegnare il cono
     num_segments = HEIGHT // 4
@@ -1586,6 +1914,20 @@ try:
 
     for i in range(len(bg_tiles)):
         bg_tiles[i] = pygame.transform.scale(bg_tiles[i], (WIDTH, HEIGHT))
+        
+    # Carica tile specifici per pareti vulcano (dimensione originale per costruzione)
+    volcano_wall_tiles = {
+        'stone': pygame.image.load("./roundedblocks/stone.png").convert_alpha(),
+        'stone_wall': pygame.image.load("./roundedblocks/stoneWall.png").convert_alpha(),
+        'lava': pygame.image.load("./roundedblocks/lava.png").convert_alpha(),
+        'ground': pygame.image.load("./roundedblocks/ground.png").convert_alpha(),
+        'shard_rock': pygame.image.load("./roundedblocks/shardRock.png").convert_alpha()  # Texture interno cratere
+    }
+    
+    # Scala i tile a dimensione standard (32x32 pixel)
+    for key in volcano_wall_tiles:
+        volcano_wall_tiles[key] = pygame.transform.scale(volcano_wall_tiles[key], (32, 32))
+        
 except Exception as e:
     # Fallback: crea tile procedurali se le immagini non esistono
     print(f"Errore caricamento immagini background: {e}. Uso tile procedurali.")
@@ -1595,6 +1937,19 @@ except Exception as e:
         tile = pygame.Surface((WIDTH, HEIGHT))
         tile.fill(color)
         bg_tiles.append(tile)
+    
+    # Crea tile vulcano procedurali
+    volcano_wall_tiles = {}
+    tile_colors = {
+        'stone': (120, 120, 120),
+        'stone_wall': (100, 100, 100), 
+        'lava': (255, 100, 0),
+        'ground': (139, 69, 19)
+    }
+    for key, color in tile_colors.items():
+        tile = pygame.Surface((32, 32))
+        tile.fill(color)
+        volcano_wall_tiles[key] = tile
 
 # ----------------- Game Objects Generation -----------------
 def create_static_platforms():

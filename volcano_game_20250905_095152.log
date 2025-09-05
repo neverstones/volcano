@@ -1,0 +1,36 @@
+09:51:52 - [INPUT] KEYDOWN key=return code=13 state=MENU
+09:51:52 - \U0001f3ae Inizia nuova partita
+09:51:52 - \U0001f504 Nuova partita iniziata!
+09:51:53 - [INPUT] KEYUP key=return code=13 state=PLAYING
+09:51:53 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:51:53 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:51:54 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:51:54 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:51:54 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:51:55 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:51:55 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:51:56 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:51:57 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:51:57 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:51:57 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:51:57 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:51:58 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:51:58 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:51:58 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:51:59 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:51:59 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:51:59 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:52:00 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:52:01 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:52:02 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:52:02 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:52:02 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:52:02 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:52:02 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:52:03 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:52:03 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:52:03 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:52:03 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:52:03 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:52:04 - [INPUT] KEYDOWN key=left ctrl code=1073742048 state=PLAYING
+09:52:04 - [INPUT] KEYUP key=left ctrl code=1073742048 state=PLAYING

@@ -1,0 +1,131 @@
+09:50:11 - [INPUT] KEYDOWN key=return code=13 state=MENU
+09:50:11 - \U0001f3ae Inizia nuova partita
+09:50:11 - \U0001f504 Nuova partita iniziata!
+09:50:11 - [INPUT] KEYUP key=return code=13 state=PLAYING
+09:50:12 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:12 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:13 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:13 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:13 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:13 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:14 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:14 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:14 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:15 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:15 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:15 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:16 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:16 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:16 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:16 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:17 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:17 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:17 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:18 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:18 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:18 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:19 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:19 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:19 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:20 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:20 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:20 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:21 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:21 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:21 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:22 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:22 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:22 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:23 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:23 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:24 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:24 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:25 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:25 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:26 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:26 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:27 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:27 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:27 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:27 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:28 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:28 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:28 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:29 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:29 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:30 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:30 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:30 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:31 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:32 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:32 - \u274c GAME OVER - Salute esaurita!
+09:50:33 - [INPUT] KEYDOWN key=t code=116 state=GAME_OVER
+09:50:33 - [INPUT] KEYUP key=t code=116 state=GAME_OVER
+09:50:33 - [INPUT] KEYDOWN key=r code=114 state=GAME_OVER
+09:50:33 - \U0001f504 Riavvio partita...
+09:50:33 - \U0001f504 Nuova partita iniziata!
+09:50:34 - [INPUT] KEYUP key=r code=114 state=PLAYING
+09:50:35 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:35 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:36 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:36 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:36 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:36 - \u274c GAME OVER - La goccia è caduta nel vuoto!
+09:50:36 - \U0001f3ae Premi R per riprovare o ESC per tornare al menu
+09:50:37 - [INPUT] KEYUP key=left code=1073741904 state=GAME_OVER
+09:50:37 - [INPUT] KEYDOWN key=r code=114 state=GAME_OVER
+09:50:37 - \U0001f504 Riavvio partita...
+09:50:37 - \U0001f504 Nuova partita iniziata!
+09:50:37 - [INPUT] KEYUP key=r code=114 state=PLAYING
+09:50:38 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:38 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:39 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:40 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:40 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:40 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:40 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:41 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:41 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:42 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:43 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:43 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:43 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:44 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:44 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:44 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:46 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:47 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:47 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:47 - \u274c GAME OVER - La goccia è caduta nel vuoto!
+09:50:47 - \U0001f3ae Premi R per riprovare o ESC per tornare al menu
+09:50:48 - [INPUT] KEYUP key=right code=1073741903 state=GAME_OVER
+09:50:48 - [INPUT] KEYDOWN key=r code=114 state=GAME_OVER
+09:50:48 - \U0001f504 Riavvio partita...
+09:50:48 - \U0001f504 Nuova partita iniziata!
+09:50:48 - [INPUT] KEYUP key=r code=114 state=PLAYING
+09:50:48 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:49 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:49 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:49 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:49 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:49 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:50 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:50 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:50 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:51 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:51 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:52 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:53 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:54 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:54 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:54 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:54 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:55 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:55 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:56 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:56 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:56 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
+09:50:57 - [INPUT] KEYDOWN key=right code=1073741903 state=PLAYING
+09:50:57 - [INPUT] KEYUP key=right code=1073741903 state=PLAYING
+09:50:58 - [INPUT] KEYDOWN key=left code=1073741904 state=PLAYING
+09:50:58 - [INPUT] KEYUP key=left code=1073741904 state=PLAYING
