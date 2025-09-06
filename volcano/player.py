@@ -1,4 +1,5 @@
 import pygame, math, random
+from constants import SCREEN_WIDTH
 
 def lerp_color(c1, c2, t):
 	return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
@@ -67,11 +68,11 @@ class WobblyBall:
 		self.y += self.vy
 
 		bounce_factor = 0.7
-		if self.x - self.radius < 0:
+		if self.x - self.radius < 0:  # bordo sinistro
 			self.x = self.radius
 			self.vx = abs(self.vx) * bounce_factor
-		if self.x + self.radius > 600: # WIDTH
-			self.x = 600 - self.radius
+		elif self.x + self.radius > SCREEN_WIDTH:  # bordo destro
+			self.x = SCREEN_WIDTH - self.radius
 			self.vx = -abs(self.vx) * bounce_factor
 
 		# Update power-ups
