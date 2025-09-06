@@ -24,6 +24,9 @@ class WobblyBall:
 		self.max_health = 3
 		self.invulnerable_time = 0
 
+		self.jump_strength = 14
+		self.on_ground = False
+
 	def apply_input(self, keys):
 		accel = 1.2
 		max_speed = 8
@@ -42,7 +45,7 @@ class WobblyBall:
 			self.vx *= friction
 
 	def jump(self):
-		base_jump = -14
+		base_jump = -self.jump_strength
 
 		# Power-up: magma jump aumenta altezza salto
 		if 'magma_jump' in self.active_powerups:

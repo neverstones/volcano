@@ -1,40 +1,27 @@
-import pygame, random
+import pygame
 from player import WobblyBall
 from platforms import PlatformManager
 from eruption_effects import draw_eruption_effects
-from constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GRAVITY, LEVELS
-from levels import LevelManager
-
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+from background_manager import BackgroundManager
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Volcano Wobbly Jump")
 clock = pygame.time.Clock()
 
-# ----- Level manager -----
-level_manager = LevelManager(LEVELS)
+# ----- Background manager -----
+background_manager = BackgroundManager()
+
+# ----- Player iniziale -----
+player = WobblyBall(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100)
 
 # ----- Piattaforme manager -----
 platforms = PlatformManager(num_platforms=10)
-
-
-# ----- Player -----
-player = WobblyBall(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150)
-
-# ----- Platforms -----
-platforms = PlatformManager(num_platforms=10)
-platforms.generate_platforms(start_x=player.x, start_y=player.y)
-
-# metto il player sopra la prima piattaforma
-start_platform = platforms.platforms[0]
-player.x = start_platform.rect.centerx
-player.y = start_platform.rect.top - player.radius
-
-
-
+platforms.generate_platforms(player=player)
 
 # ----- Eruzione simulata -----
-crater_info = (SCREEN_WIDTH//2 - 50, SCREEN_WIDTH//2 + 50, SCREEN_HEIGHT)
+crater_info = (SCREEN_WIDTH // 2 - 50, SCREEN_WIDTH // 2 + 50, SCREEN_HEIGHT)
 
 # ----- Main loop -----
 running = True
@@ -50,9 +37,8 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r and game_over:
                 # Reset game
-                start_platform = platforms.platforms[0]
-                player = WobblyBall(start_platform.rect.centerx, start_platform.rect.top - 32)
-                platforms.generate_platforms()
+                player = WobblyBall(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100)
+                platforms.generate_platforms(player=player)
                 game_over = False
 
     if not game_over:
@@ -60,24 +46,32 @@ while running:
         player.apply_input(keys)
         player.update(dt)
 
-    # --- Collisione con piattaforme + rimbalzo automatico ---
-        if platforms.check_collision(player):
-            player.jump()   # salto automatico in stile doodle jump
+        # Collisione con piattaforme
+        platforms.check_collision(player)
 
-    # --- Scroll verticale ---
+        # Limiti orizzontali (area d'azione)
+        if player.x - player.radius < 50:   # margine sinistro
+            player.x = 50 + player.radius
+            player.vx = 0
+        elif player.x + player.radius > SCREEN_WIDTH - 50:  # margine destro
+            player.x = SCREEN_WIDTH - 50 - player.radius
+            player.vx = 0
+
+        # Scroll verticale (quando il player sale)
         if player.vy < 0 and player.y < SCREEN_HEIGHT * 0.4:
             dy = int((SCREEN_HEIGHT * 0.4 - player.y) * 0.5)
             player.y += dy
             platforms.update(dy)
+            background_manager.update(dy)   # 🔥 aggiorna lo sfondo insieme alle piattaforme
 
-    # --- Controllo game over ---
+
+        # Controllo game over (caduta fuori schermo)
         if player.y - player.radius > SCREEN_HEIGHT:
             game_over = True
 
     # ----- Draw -----
     screen.fill((20, 20, 30))
-    screen.blit(level_manager.get_background(), (0, 0))
-    draw_eruption_effects(crater_info, km_height=50, screen=screen)
+    background_manager.draw(screen)
     platforms.draw(screen)
     player.draw_trail(screen)
     player.draw_particles(screen)
