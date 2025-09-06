@@ -1,8 +1,13 @@
-# ----------------- Volcano Level Generation (Deterministico) -----------------
-import pygame, random, math, sys, json, os
+# ----------------- Power-ups System -----------------
+import pygame
+import random
+import math
+import sys
+import json
+import os
 import logging
 from datetime import datetime
-from game_constants import WIDTH, HEIGHT, TILE_SIZE, KM_PER_LEVEL, LEVEL_VULCANO
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE, KM_PER_LEVEL, LEVEL_VULCANO
 
 
 # ----------------- Power-ups -----------------
@@ -32,7 +37,7 @@ class PowerUp:
             return
 
         screen_y = self.y + world_offset
-        if -50 < screen_y < HEIGHT + 50:
+        if -50 < screen_y < SCREEN_HEIGHT + 50:
             # Animazione pulsante
             pulse = math.sin(self.animation_time) * 0.3 + 1.0
             radius = int(self.radius * pulse)

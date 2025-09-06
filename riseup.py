@@ -308,28 +308,28 @@ TILE_SIZE = 32
 
 # Mappa semplice di esempio (larghezza adattata allo schermo)
 # Puoi sostituirla con una mappa più lunga/complessa o caricarla da file
-# Sezione di un vulcano a cono con cratere in cima
+# Sezione di un vulcano a cono con cratere in cima - CORRETTA (cratere in alto, base larga in basso)
 VOLCANO_MAP = [
-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "xooooooooooooooooooooooooooooooooooooooooooooooooooox",
-    "xxoooooooooooooooooooooooooooooooooooooooooooooooooxx",
-    "xxxoooooooooooooooooooooooooooooooooooooooooooooooxxx",
-    "xxxxoooooooooooooooooooooooooooooooooooooooooooooxxxx",
-    "xxxxxoooooooooooooooooooooooooooooooooooooooooooxxxxx",
-    "xxxxxxoooooooooooooooooooooooooooooooooooooooooxxxxxx",
-    "xxxxxxxoooooooooooooooooooooooooooooooooooooooxxxxxxx",
-    "xxxxxxxxoooooooooooooooooooooooooooooooooooooxxxxxxxx",
-    "xxxxxxxxxoooooooooooooooooooooooooooooooooooxxxxxxxxx",
-    "xxxxxxxxxxoooooooooooooooooooooooooooooooooxxxxxxxxxx",
-    "xxxxxxxxxxxoooooooooooooooooooooooooooooooxxxxxxxxxxx",
-    "xxxxxxxxxxxxoooooooooooooooooooooooooooooxxxxxxxxxxxx",
-    "xxxxxxxxxxxxxoooooooooooooooooooooooooooxxxxxxxxxxxxx",
-    "xxxxxxxxxxxxxxoooooooooooooooooooooooooxxxxxxxxxxxxxx",
-    "xxxxxxxxxxxxxxxoooooooooooooooooooooooxxxxxxxxxxxxxxx",
-    "xxxxxxxxxxxxxxxxoooooooooooooooooooooxxxxxxxxxxxxxxxx",
-    "xxxxxxxxxxxxxxxxxoooooooooooooooooooxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxxxoooooooooooooooxxxxxxxxxxxxxxxxxxx",  # Cratere stretto in cima
     "xxxxxxxxxxxxxxxxxxoooooooooooooooooxxxxxxxxxxxxxxxxxx",
-    "xxxxxxxxxxxxxxxxxxxoooooooooooooooxxxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxxoooooooooooooooooooxxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxxoooooooooooooooooooooxxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxxoooooooooooooooooooooooxxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxxoooooooooooooooooooooooooxxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxxoooooooooooooooooooooooooooxxxxxxxxxxxxx",
+    "xxxxxxxxxxxxoooooooooooooooooooooooooooooxxxxxxxxxxxx",
+    "xxxxxxxxxxxoooooooooooooooooooooooooooooooxxxxxxxxxxx",
+    "xxxxxxxxxxoooooooooooooooooooooooooooooooooxxxxxxxxxx",
+    "xxxxxxxxxoooooooooooooooooooooooooooooooooooxxxxxxxxx",
+    "xxxxxxxxoooooooooooooooooooooooooooooooooooooxxxxxxxx",
+    "xxxxxxxoooooooooooooooooooooooooooooooooooooooxxxxxxx",
+    "xxxxxxoooooooooooooooooooooooooooooooooooooooooxxxxxx",
+    "xxxxxoooooooooooooooooooooooooooooooooooooooooooxxxxx",
+    "xxxxoooooooooooooooooooooooooooooooooooooooooooooxxxx",
+    "xxxoooooooooooooooooooooooooooooooooooooooooooooooxxx",
+    "xxoooooooooooooooooooooooooooooooooooooooooooooooooxx",
+    "xooooooooooooooooooooooooooooooooooooooooooooooooooox",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",  # Base larga del vulcano
     "xxxxxxxxxxxxxxxxxxxxoooooooooooooxxxxxxxxxxxxxxxxxxxx",
     "xxxxxxxxxxxxxxxxxxxxxoooooooooooxxxxxxxxxxxxxxxxxxxxx",
     "xxxxxxxxxxxxxxxxxxxxxxoooooooooxxxxxxxxxxxxxxxxxxxxxx",
@@ -493,7 +493,7 @@ def check_crater_entry(player, y_offset):
     return is_in_crater_vertically and is_in_crater_horizontally
 
 def check_conical_volcano_walls_collision(ball, world_offset):
-    """Controlla che la goccia rimanga nel passaggio del vulcano conico - VERSIONE CORRETTA"""
+    """Controlla che la goccia rimanga nel passaggio del vulcano conico - RIATTIVATO"""
     # Parametri del vulcano conico (devono corrispondere a draw_conical_volcano_walls)
     base_width = WIDTH * 0.65      # Aggiornato per il nuovo design più stretto
     crater_width = WIDTH * 0.15    # Aggiornato per il nuovo design più stretto
@@ -508,13 +508,10 @@ def check_conical_volcano_walls_collision(ball, world_offset):
     
     # Progressione nel vulcano (0 = base, 1 = cratere)
     volcano_progress = (current_km - volcano_start_km) / (volcano_end_km - volcano_start_km)
+    volcano_progress = max(0, min(1, volcano_progress))  # Clamp tra 0 e 1
     
-    # Calcola la larghezza del passaggio alla posizione Y del giocatore
-    screen_y = ball.y - world_offset
-    height_ratio = (HEIGHT - screen_y) / HEIGHT  # 0 = basso schermo, 1 = alto schermo
-    height_ratio = max(0, min(1, height_ratio))
-    
-    current_passage_width = base_width - (base_width - crater_width) * height_ratio
+    # Il passaggio si stringe man mano che si sale nel vulcano (progress aumenta)
+    current_passage_width = base_width - (base_width - crater_width) * volcano_progress
     passage_left = (WIDTH - current_passage_width) / 2
     passage_right = WIDTH - passage_left
     
@@ -523,11 +520,13 @@ def check_conical_volcano_walls_collision(ball, world_offset):
     
     # Parete sinistra - sposta dolcemente verso il centro
     if ball.x - ball.radius < passage_left:
+        print(f"🔍 COLLISION LEFT VULCANO: ball.x={ball.x:.1f}, passage_left={passage_left:.1f}")
         ball.x = passage_left + ball.radius + 2
         collision = True
         
     # Parete destra - sposta dolcemente verso il centro  
     elif ball.x + ball.radius > passage_right:
+        print(f"🔍 COLLISION RIGHT VULCANO: ball.x={ball.x:.1f}, passage_right={passage_right:.1f}")
         ball.x = passage_right - ball.radius - 2
         collision = True
     
@@ -1605,116 +1604,9 @@ def draw_victory_screen():
     instruction = SMALL_FONT.render("Premi INVIO per salvare il punteggio", True, (200, 200, 200))
     screen.blit(instruction, (WIDTH//2 - instruction.get_width()//2, 350))
 
-# ----------------- Enhanced Environment -----------------
-    
-    # Numero di sezioni per disegnare il cono
-    num_segments = HEIGHT // 4
-    
-    for i in range(num_segments):
-        # Altezza relativa di questa sezione (0 = basso, 1 = alto)
-        # AGGIUNGI LA PROGRESSIONE DEL GIOCATORE per far variare la larghezza
-        segment_height = (i / num_segments) + volcano_progress * 0.3  # Effetto dinamico
-        segment_height = min(1, segment_height)  # Non superare 1
-        
-        y = HEIGHT - (i + 1) * 4
-        
-        # Calcola la larghezza del passaggio a questa altezza
-        current_passage_width = base_width - (base_width - crater_width) * segment_height
-        
-        # Posizioni delle pareti - il cono è al CENTRO dello schermo
-        passage_left = (WIDTH - current_passage_width) / 2
-        passage_right = WIDTH - passage_left
-        
-        # Colori per l'interno del vulcano (scuro e roccioso)
-        heat_factor = segment_height * 0.7  # Più caldo verso l'alto
-        base_rock_color = (40, 20, 15)  # Marrone scuro per l'interno
-        
-        if heat_factor > 0.4:
-            # Roccia riscaldata verso rosso/arancione
-            r = min(180, base_rock_color[0] + int(heat_factor * 140))
-            g = max(15, base_rock_color[1] + int(heat_factor * 60))
-            b = max(10, base_rock_color[2] + int(heat_factor * 25))
-            interior_color = (r, g, b)
-        else:
-            interior_color = base_rock_color
-        
-        # Colore delle pareti rocciose (più chiaro)
-        wall_color = tuple(min(255, int(c * 2.5)) for c in interior_color)
-        shadow_color = tuple(max(0, int(c * 0.6)) for c in wall_color)
-        
-        # RIEMPIE L'INTERNO DEL CONO con colore scuro
-        if current_passage_width > 0:
-            interior_rect = pygame.Rect(passage_left, y, current_passage_width, 4)
-            pygame.draw.rect(screen, interior_color, interior_rect)
-        
-        # Disegna i bordi delle pareti del cono (spessore delle pareti)
-        wall_thickness = 8
-        
-        # Parete sinistra
-        if passage_left > wall_thickness:
-            # Superficie esterna della parete (illuminata)
-            pygame.draw.line(screen, wall_color, 
-                           (passage_left - wall_thickness, y), (passage_left, y), wall_thickness)
-            # Bordo interno (più scuro)
-            pygame.draw.line(screen, shadow_color, 
-                           (passage_left - 1, y), (passage_left, y), 2)
-        
-        # Parete destra
-        if passage_right < WIDTH - wall_thickness:
-            # Superficie esterna della parete (illuminata)
-            pygame.draw.line(screen, wall_color,
-                           (passage_right, y), (passage_right + wall_thickness, y), wall_thickness)
-            # Bordo interno (più scuro)
-            pygame.draw.line(screen, shadow_color,
-                           (passage_right, y), (passage_right + 1, y), 2)
-        
-        # Aggiungi texture rocciosa FISSA (non casuale) sulle pareti
-        # Usa coordinate per pattern deterministico
-        if ((i + int(world_offset / 100)) % 13) == 0:  # Pattern fisso ogni 13 segmenti
-            # Crepe e irregolarità sulle pareti - POSIZIONI FISSE
-            crack_seed = i % 3  # Pattern ripetitivo ogni 3
-            
-            # Parete sinistra
-            if passage_left > wall_thickness:
-                crack_x = int(passage_left - wall_thickness + (crack_seed * 3))
-                crack_y = y
-                crack_size = 1 + (crack_seed % 2)
-                crack_color = tuple(max(0, int(c * 0.7)) for c in wall_color)
-                pygame.draw.circle(screen, crack_color, (crack_x, crack_y), crack_size)
-            
-            # Parete destra
-            if passage_right < WIDTH - wall_thickness:
-                crack_x = int(passage_right + crack_seed * 2)
-                crack_y = y
-                crack_color = tuple(max(0, int(c * 0.7)) for c in wall_color)
-                pygame.draw.circle(screen, crack_color, (crack_x, crack_y), crack_size)
-        
-        # Bagliore di lava nell'interno nelle zone calde (parte alta) - FISSO
-        if segment_height > 0.8 and ((i + int(world_offset / 50)) % 20) == 0:
-            glow_intensity = (segment_height - 0.8) / 0.2  # 0 a 1
-            glow_color = (255, int(80 + glow_intensity * 120), 0, int(40 * glow_intensity))
-            glow_surface = pygame.Surface((int(current_passage_width), 6), pygame.SRCALPHA)
-            pygame.draw.rect(glow_surface, glow_color, (0, 0, int(current_passage_width), 6))
-            screen.blit(glow_surface, (passage_left, y - 3))
-    
-    # Disegna il cratere in cima (apertura finale)
-    crater_top_y = 60  # Posizione Y del cratere
-    crater_width_final = WIDTH * 0.15
-    crater_left = (WIDTH - crater_width_final) / 2
-    crater_right = WIDTH - crater_left
-    
-    # Bordo del cratere con effetto lava
-    crater_rim_color = (120, 60, 30)
-    pygame.draw.line(screen, crater_rim_color, (crater_left - 5, crater_top_y), (crater_left, crater_top_y), 8)
-    pygame.draw.line(screen, crater_rim_color, (crater_right, crater_top_y), (crater_right + 5, crater_top_y), 8)
-    
-    # Bagliore interno del cratere
-    crater_glow = pygame.Surface((crater_width_final + 20, 40), pygame.SRCALPHA)
-    for r in range(20, 0, -3):
-        alpha = int(150 * (r / 20))
-        glow_color = (255, 100, 0, alpha)
-        pygame.draw.ellipse(crater_glow, glow_color, (10 + (20-r), 20 + (20-r)//2, crater_width_final + r*2, r))
-    screen.blit(crater_glow, (crater_left - 10, crater_top_y - 10))
+# =========================
+# MAIN GAME LOGIC
+# =========================
 
 def draw_external_sky_background():
     """Disegna il cielo e le montagne sullo sfondo esterno al vulcano"""
@@ -2005,19 +1897,52 @@ def create_static_platforms():
             random.randint(2*WIDTH//3, WIDTH-150)
         ])
 
-        # livello in base all'altezza
+        # livello in base all'altezza - FERMA LA CROSTA PRIMA DEL VULCANO
         height_km = abs(start_y - current_y) / PIXEL_PER_KM
         if height_km <= KM_PER_LEVEL[LEVEL_MANTELLO]:
             level = LEVEL_MANTELLO
-        elif height_km <= KM_PER_LEVEL[LEVEL_CROSTA]:
+        elif height_km <= KM_PER_LEVEL[LEVEL_CROSTA] - 0.5:  # Ferma la crosta 500m prima del vulcano
             level = LEVEL_CROSTA
         else:
             level = LEVEL_VULCANO
 
-        add_platform(x, current_y, level)
+        # SOLO aggiunge piattaforme se siamo nella crosta/mantello (non nel vulcano)
+        if level != LEVEL_VULCANO:
+            add_platform(x, current_y, level)
 
     pass  # Rimosso debug generazione livello
-    return platforms, platform_types, powerups, collectibles, enemies
+    
+    # PULIZIA FINALE: rimuovi tutte le piattaforme troppo vicine al confine vulcano
+    cleaned_platforms = []
+    cleaned_platform_types = []
+    cleaned_powerups = []
+    cleaned_collectibles = []
+    cleaned_enemies = []
+    
+    for i, plat in enumerate(platforms):
+        plat_height_km = abs(start_y - plat.y) / PIXEL_PER_KM
+        # Filtro aggiornato: mantieni piattaforme sotto 28km E nel vulcano (30km+)
+        if plat_height_km < 28.0 or plat_height_km >= 30.0:
+            cleaned_platforms.append(plat)
+            cleaned_platform_types.append(platform_types[i])
+    
+    # Filtra anche powerups, collectibles, enemies basandosi sulle piattaforme rimosse
+    for powerup in powerups:
+        powerup_height_km = abs(start_y - powerup.y) / PIXEL_PER_KM
+        if powerup_height_km < 28.0 or powerup_height_km >= 30.0:  # Mantieni sotto 28km E nel vulcano
+            cleaned_powerups.append(powerup)
+            
+    for collectible in collectibles:
+        collectible_height_km = abs(start_y - collectible.y) / PIXEL_PER_KM
+        if collectible_height_km < 28.0 or collectible_height_km >= 30.0:  # Mantieni sotto 28km E nel vulcano
+            cleaned_collectibles.append(collectible)
+            
+    for enemy in enemies:
+        enemy_height_km = abs(start_y - enemy.y) / PIXEL_PER_KM
+        if enemy_height_km < 28.0 or enemy_height_km >= 30.0:  # Mantieni sotto 28km E nel vulcano
+            cleaned_enemies.append(enemy)
+    
+    return cleaned_platforms, cleaned_platform_types, cleaned_powerups, cleaned_collectibles, cleaned_enemies
 
 platforms, platform_types, powerups, collectibles, enemies = create_static_platforms()
 
@@ -2559,11 +2484,42 @@ def main():
                 max_scroll = 15
                 actual_dy = min(max_scroll, actual_dy)
 
-                world_offset += actual_dy
-                player.y += actual_dy
-                score += int(actual_dy * 0.2)
-
+                # Calcola il livello prima di applicare lo scroll per evitare blocchi
                 km_height = world_offset / PIXEL_PER_KM
+                
+                # DEBUG per movimento e scroll nella zona critica
+                if 28.5 <= km_height <= 31.0:
+                    print(f"  SCROLL DEBUG: target_dy={target_dy:.2f}, actual_dy={actual_dy:.2f}")
+                    print(f"  SCROLL DEBUG: player.y={player.y:.2f}, SCROLL_THRESH={SCROLL_THRESH}")
+                    volcano_threshold = KM_PER_LEVEL[LEVEL_CROSTA] - 0.2
+                    print(f"  SCROLL DEBUG: volcano_threshold={volcano_threshold:.2f}")
+                    print(f"  SCROLL DEBUG: volcano_scroll_mode={getattr(draw_hud, 'volcano_scroll_mode', False)}")
+                
+                # Isteresi per evitare oscillazioni alla soglia: una volta entrati nel vulcano, ci rimaniamo
+                # fino a scendere sotto una soglia più bassa
+                volcano_threshold = KM_PER_LEVEL[LEVEL_CROSTA] - 0.2  # Abbassato a 29.8 km per permettere l'entrata
+                volcano_exit_threshold = volcano_threshold - 0.5  # Isteresi di 0.5 km
+                
+                # Determina se siamo in modalità vulcano usando isteresi
+                if not hasattr(draw_hud, 'volcano_scroll_mode'):
+                    draw_hud.volcano_scroll_mode = False
+                    
+                if not draw_hud.volcano_scroll_mode and km_height >= volcano_threshold:
+                    draw_hud.volcano_scroll_mode = True
+                elif draw_hud.volcano_scroll_mode and km_height < volcano_exit_threshold:
+                    draw_hud.volcano_scroll_mode = False
+                
+                # Applica scroll in base alla modalità stabile
+                # Il player.y si aggiorna sempre uguale per mantenere il calcolo di target_dy
+                player.y += actual_dy
+                
+                if draw_hud.volcano_scroll_mode:
+                    # In modalità vulcano: inverti world_offset per effetto salita
+                    world_offset -= actual_dy  # Mondo va verso l'alto
+                else:
+                    # Modalità normale: world_offset va verso il basso  
+                    world_offset += actual_dy
+                score += int(actual_dy * 0.2)
                 pass  # Rimosso debug scroll
 
                 # Update level
@@ -2592,34 +2548,45 @@ def main():
                     log_game_event("🌋 ERUZIONE INIZIATA! La goccia è entrata nel cratere!")
 
             km_height = world_offset / PIXEL_PER_KM
-            # Collisioni
+            
+            # DEBUG: Logging dettagliato per la zona critica
+            if 28.5 <= km_height <= 31.0:
+                print(f"DEBUG COLLISIONE km_height={km_height:.2f}:")
+                print(f"  world_offset={world_offset}")
+                print(f"  player y={player.y}")
+                print(f"  KM_PER_LEVEL[LEVEL_VULCANO]={KM_PER_LEVEL[LEVEL_VULCANO]}")
+                print(f"  Numero piattaforme attive: {len(platforms)}")
+                # Conta piattaforme per altezza (corretto per oggetti Rect)
+                platform_count_by_height = {}
+                for platform in platforms:
+                    platform_km = (platform.y + world_offset) / PIXEL_PER_KM
+                    range_key = f"{platform_km//1:.0f}-{platform_km//1+1:.0f}km"
+                    platform_count_by_height[range_key] = platform_count_by_height.get(range_key, 0) + 1
+                print(f"  Piattaforme per altezza: {platform_count_by_height}")
+            
+            # Collisioni - MAPPA CONTIGUA: tratta vulcano come estensione della crosta
             grounded, idx = (False, None)
             landing_source = None  # 'base', 'volcano_surface', 'volcano_dynamic', or None
-            if km_height < KM_PER_LEVEL[LEVEL_CROSTA]:
+            
+            # Unifica la gestione: usa sempre le piattaforme normali fino al vulcano
+            if km_height < KM_PER_LEVEL[LEVEL_VULCANO]:  # Cambiato: fino a 40 km invece di 30 km
+                # Controllo normale delle collisioni (le piattaforme crosta ora si fermano a 29.5 km)
                 grounded, idx = check_platform_collision(player, platforms, world_offset)
+                    
                 if grounded:
-                    landing_source = 'base'
-            else:
-                # Nel vulcano conico - controlla collisioni con pareti e piattaforme
-                # 1) Prima controlla collisione con le pareti del vulcano conico
-                wall_collision = check_conical_volcano_walls_collision(player, world_offset)
-                if wall_collision:
-                    # La goccia ha colpito una parete, respingila verso il centro
-                    pass  # Gestito dentro la funzione
-                
-                # 2) Piattaforme di superficie del vulcano (ora coniche)
-                grounded, idx = check_platform_collision(player, VOLCANO_PLATFORMS, world_offset)
-                if grounded:
-                    landing_source = 'volcano_surface'
-                else:
-                    # 3) Piattaforme dinamiche nella sezione vulcano
-                    volcano_dyn_plats = [platforms[i] for i, t in enumerate(platform_types) if t == LEVEL_VULCANO]
-                    grounded, idx = check_platform_collision(player, volcano_dyn_plats, world_offset)
-                    if grounded:
-                        landing_source = 'volcano_dynamic'
+                    if km_height < KM_PER_LEVEL[LEVEL_CROSTA]:
+                        landing_source = 'base'
                     else:
-                        # 4) Fallback: collisione diretta coi tile top (disabilitata per il nuovo design)
-                        pass  # landed_tmp, _ = check_volcano_tile_collision(player, world_offset)
+                        landing_source = 'volcano_surface'  # Stesso comportamento ma nel vulcano
+            else:
+                # Oltre i 40 km: gestisci fine gioco o vittoria
+                print(f"🔍 OLTRE IL VULCANO: km_height={km_height:.2f}")
+                grounded, idx = False, None  # Nessuna piattaforma oltre il vulcano
+                
+            # Aggiungi collisioni pareti vulcano se siamo nella zona vulcano
+            if km_height >= KM_PER_LEVEL[LEVEL_CROSTA]:
+                wall_collision = check_conical_volcano_walls_collision(player, world_offset)
+                
             if grounded and player.vy >= 0:
                 # Se proviene da piattaforme
                 if idx is not None and landing_source is not None:
@@ -2635,8 +2602,8 @@ def main():
                     if plat is not None:
                         player.y = plat.top + world_offset - player.radius
                 else:
-                    # Controllo collisione tile vulcano per ottenere la Y di atterraggio
-                    landed, landing_y = check_volcano_tile_collision(player, world_offset)
+                    # Controllo collisione tile vulcano per ottenere la Y di atterraggio - TEMPORANEAMENTE DISABILITATO
+                    landed, landing_y = False, None  # check_volcano_tile_collision(player, world_offset)
                     if landed and landing_y is not None:
                         player.y = landing_y - player.radius
                 player.jump()

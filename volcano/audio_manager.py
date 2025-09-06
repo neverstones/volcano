@@ -4,7 +4,7 @@ Audio system for the volcano game.
 import pygame
 import math
 import os
-from volcano.constants import AUDIO_FREQUENCY, AUDIO_BUFFER
+from constants import AUDIO_FREQUENCY, AUDIO_BUFFER
 
 class AudioManager:
     def __init__(self):
