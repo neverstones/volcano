@@ -4,8 +4,8 @@ Constants used throughout the volcano game.
 import pygame
 
 # Screen dimensions
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 700
+SCREEN_HEIGHT = 800
 FPS = 60
 GRAVITY = 0.98
 
@@ -23,6 +23,9 @@ ACTION_AREA_RIGHT = SCREEN_WIDTH - 50
 
 LEVEL_HEIGHT = 2000
 
+# Dimensioni piattaforme
+PLATFORM_WIDTH = 100
+PLATFORM_HEIGHT = 20
 
 
 LEVELS = [
