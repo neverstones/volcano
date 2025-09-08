@@ -23,6 +23,11 @@ class LevelManager:
 
     def update(self, player_y):
         """Aggiorna il livello in base all'altezza del player."""
+        # Ogni livello ha 3 sezioni di background (3 * SCREEN_HEIGHT)
+        # Quindi la distanza per livello è LEVEL_HEIGHT / 3
+        sections_per_level = 3
+        section_height = LEVEL_HEIGHT // sections_per_level  # 2000 / 3 ≈ 666
+        
         level_index = int(abs(player_y) // LEVEL_HEIGHT)
         if level_index < len(self.level_defs):
             self.current_index = level_index
