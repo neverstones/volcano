@@ -183,7 +183,7 @@ class BackgroundManager:
             
         # Calcola se il player è arrivato al cratere (zona dove le pareti finiscono)
         total_height = self.tiles_per_level * SCREEN_HEIGHT
-        crater_height = total_height * 0.9  # 90% dell'altezza totale del vulcano
+        crater_height = total_height * 0.95  # 95% dell'altezza totale del vulcano (era 0.9)
         
         # Il player è al cratere se ha scrollato abbastanza verso l'alto
         player_absolute_height = self.volcano_total_scroll + (SCREEN_HEIGHT - player_y)
@@ -346,7 +346,7 @@ class BackgroundManager:
         base_width = SCREEN_WIDTH  # Largo dove entra la goccia (in basso)
         crater_width = 120  # Stretto al cratere (in cima)
         total_height = self.tiles_per_level * SCREEN_HEIGHT
-        crater_height = total_height * 0.9  # 90% dell'altezza = inizio cratere
+        crater_height = total_height * 0.95  # 95% dell'altezza = inizio cratere (era 0.9)
         
         if total_height <= 0:
             return
@@ -403,7 +403,7 @@ class BackgroundManager:
         base_width = SCREEN_WIDTH
         crater_width = 120
         total_height = self.tiles_per_level * SCREEN_HEIGHT
-        crater_height = total_height * 0.9  # 90% dell'altezza = inizio cratere
+        crater_height = total_height * 0.95  # 95% dell'altezza = inizio cratere (era 0.9)
         
         if total_height <= 0:
             return None

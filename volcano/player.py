@@ -31,6 +31,17 @@ class WobblyBall:
     def get_rect(self):
         return pygame.Rect(self.x - self.radius, self.y - self.radius, self.radius*2, self.radius*2)
 
+    def is_invulnerable(self):
+        """Controlla se il player è attualmente invulnerabile."""
+        return self.invulnerable_time > 0
+    
+    def take_damage(self, duration=1.5):
+        """Applica danno e attiva l'invulnerabilità temporanea."""
+        if not self.is_invulnerable():
+            self.invulnerable_time = duration
+            return True  # Danno applicato
+        return False  # Era già invulnerabile
+
     def apply_input(self, keys):
         accel = 1.5  # Aumentato da 1.2 per più controllo orizzontale
         max_speed = 10  # Aumentato da 8 per raggiungere piattaforme più distanti
