@@ -3,6 +3,10 @@ Constants used throughout the volcano game.
 """
 import pygame
 
+
+#Game time
+GAME_TIME = 300
+
 # Screen dimensions
 SCREEN_WIDTH = 700
 SCREEN_HEIGHT = 800

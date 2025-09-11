@@ -1,7 +1,7 @@
 """
 Game states and global variables for the volcano game.
 """
-from volcano.constants import *
+from constants import *
 
 # Global game state variables
 game_state = MENU
