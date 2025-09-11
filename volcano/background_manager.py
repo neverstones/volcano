@@ -10,10 +10,10 @@ def lerp_color(c1, c2, t):
 # --- Particelle lava (fontana) ---
 class LavaParticle:
     def __init__(self, x, y):
-        self.x = x + random.uniform(-15,15)  # Dispersione iniziale più ampia (era -8,8)
+        self.x = x + random.uniform(-8,8)  # Più stretto (era -20,20)
         self.y = y
-        self.vx = random.uniform(-3.0, 3.0)  # Velocità orizzontale molto più ampia (era -1.0, 1.0)
-        self.vy = random.uniform(-16, -9)  # Velocità verticale normale
+        self.vx = random.uniform(-1.0, 1.0)  # Velocità orizzontale ridotta (era -2.0, 2.0)
+        self.vy = random.uniform(-16, -9)  # più alta
         self.radius = random.uniform(6,10)
         self.trail = []
         self.max_trail = 30
@@ -46,10 +46,10 @@ class LavaParticle:
 # --- Particelle fumo (plume aeriforme largo) ---
 class SmokeParticle:
     def __init__(self, x, y):
-        self.x = x + random.uniform(-40,40)  # Dispersione iniziale più ampia (era -25,25)
+        self.x = x + random.uniform(-25,25)  # Un po' meno largo (era -50,50)
         self.y = y - 40  # parte prima della fontana
-        self.vx = random.uniform(-1.0,1.0)  # Velocità orizzontale più ampia (era -0.4,0.4)
-        self.vy = random.uniform(-3.5,-1.8)  # Velocità verticale normale
+        self.vx = random.uniform(-0.4,0.4)  # Velocità ridotta (era -0.6,0.6)
+        self.vy = random.uniform(-3.5,-1.8)
         self.radius = random.uniform(12,20)
         self.age = 0
         self.max_age = random.randint(140,180)
@@ -183,7 +183,7 @@ class BackgroundManager:
             
         # Calcola se il player è arrivato al cratere (zona dove le pareti finiscono)
         total_height = self.tiles_per_level * SCREEN_HEIGHT
-        crater_height = total_height * 0.95  # 95% dell'altezza totale del vulcano (era 0.9)
+        crater_height = total_height * 0.9  # 90% dell'altezza totale del vulcano
         
         # Il player è al cratere se ha scrollato abbastanza verso l'alto
         player_absolute_height = self.volcano_total_scroll + (SCREEN_HEIGHT - player_y)
@@ -346,7 +346,7 @@ class BackgroundManager:
         base_width = SCREEN_WIDTH  # Largo dove entra la goccia (in basso)
         crater_width = 120  # Stretto al cratere (in cima)
         total_height = self.tiles_per_level * SCREEN_HEIGHT
-        crater_height = total_height * 0.95  # 95% dell'altezza = inizio cratere (era 0.9)
+        crater_height = total_height * 0.9  # 90% dell'altezza = inizio cratere
         
         if total_height <= 0:
             return
@@ -403,7 +403,7 @@ class BackgroundManager:
         base_width = SCREEN_WIDTH
         crater_width = 120
         total_height = self.tiles_per_level * SCREEN_HEIGHT
-        crater_height = total_height * 0.95  # 95% dell'altezza = inizio cratere (era 0.9)
+        crater_height = total_height * 0.9  # 90% dell'altezza = inizio cratere
         
         if total_height <= 0:
             return None
