@@ -1,4 +1,4 @@
-import pygame, random
+import pygame, random, math
 from constants import SCREEN_WIDTH, PLATFORM_WIDTH, PLATFORM_HEIGHT, SCREEN_HEIGHT
 
 class Platform(pygame.sprite.Sprite):
@@ -17,7 +17,7 @@ class Platform(pygame.sprite.Sprite):
                 self.speed *= -1
 
     def draw(self, screen):
-        screen.blit(self.image,self.rect.topleft)
+        screen.blit(self.image, self.rect.topleft)
 
 class PlatformManager:
     def __init__(self,num_platforms=10):

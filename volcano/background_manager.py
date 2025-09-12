@@ -10,16 +10,16 @@ def lerp_color(c1, c2, t):
 # --- Particelle lava (fontana) ---
 class LavaParticle:
     def __init__(self, x, y):
-        self.x = x + random.uniform(-8,8)  # Più stretto (era -20,20)
+        self.x = x + random.uniform(-20, 20)    # Dispersione per caduta laterale
         self.y = y
-        self.vx = random.uniform(-1.0, 1.0)  # Velocità orizzontale ridotta (era -2.0, 2.0)
-        self.vy = random.uniform(-16, -9)  # più alta
-        self.radius = random.uniform(6,10)
+        self.vx = random.uniform(-10.0, 10.0)   # Velocità orizzontale per arco
+        self.vy = random.uniform(-50, -25)      # Velocità verticale per getto alto
+        self.radius = random.uniform(5, 9)      # Dimensioni moderate
         self.trail = []
-        self.max_trail = 30
+        self.max_trail = 35                     # Scia per vedere traiettoria
 
     def update(self):
-        gravity = 0.35
+        gravity = 0.12  # Gravità ridotta per arco più ampio
         self.vy += gravity
         self.x += self.vx
         self.y += self.vy
@@ -46,13 +46,13 @@ class LavaParticle:
 # --- Particelle fumo (plume aeriforme largo) ---
 class SmokeParticle:
     def __init__(self, x, y):
-        self.x = x + random.uniform(-25,25)  # Un po' meno largo (era -50,50)
-        self.y = y - 40  # parte prima della fontana
-        self.vx = random.uniform(-0.4,0.4)  # Velocità ridotta (era -0.6,0.6)
-        self.vy = random.uniform(-3.5,-1.8)
-        self.radius = random.uniform(12,20)
+        self.x = x + random.uniform(-50, 50)    # Dispersione limitata
+        self.y = y - 25                         # Altezza contenuta
+        self.vx = random.uniform(-4.0, 4.0)     # Velocità orizzontale limitata
+        self.vy = random.uniform(-10.0, -5.0)   # Velocità verticale moderata
+        self.radius = random.uniform(10, 18)    # Nuvole piccole
         self.age = 0
-        self.max_age = random.randint(140,180)
+        self.max_age = random.randint(120, 160) # Durata più breve
 
     def update(self):
         # sale verso l'alto con dispersione
@@ -213,21 +213,24 @@ class BackgroundManager:
     def _particle_should_stay(self, particle):
         """Determina se una particella dovrebbe rimanere attiva o essere rimossa."""
         # Se esce dal fondo dello schermo, rimuovila
-        if particle.y > SCREEN_HEIGHT + 50:
+        if particle.y > SCREEN_HEIGHT + 100:  # Aumentato margine da +50 a +100
             return False
         
         # Se la particella ha un fade_factor troppo basso, rimuovila
         if hasattr(particle, 'fade_factor') and particle.fade_factor <= 0.01:
             return False
         
-        # Se la particella sta cadendo (velocità positiva) e ha superato una certa altezza
-        if particle.vy > 0 and particle.y > SCREEN_HEIGHT // 2:
-            # Controlla se è all'interno dell'area del cratere
+        # Se siamo nel vulcano, limita le particelle alle pareti
+        if self.current_index == self.volcano_level_index:
             walls = self.get_volcano_walls_at_y(particle.y)
             if walls is not None:
-                # Se ci sono pareti e la particella è fuori dal passaggio, rimuovila
+                # Le particelle non devono uscire dalle pareti del vulcano
                 if particle.x < walls['left_wall_end'] or particle.x > walls['right_wall_start']:
                     return False
+        else:
+            # Negli altri livelli, usa margini più ampi
+            if particle.x < -200 or particle.x > SCREEN_WIDTH + 200:
+                return False
         
         return True
 
@@ -250,9 +253,9 @@ class BackgroundManager:
         fountain_x = SCREEN_WIDTH // 2
         fountain_y = SCREEN_HEIGHT // 2  # Centro schermo
         
-        for _ in range(10):  # Aumentato da 8 a 10 per fontana ultra-densa
+        for _ in range(7):  # Più particelle per fontana di lava realistica
             self.lava_particles.append(LavaParticle(fountain_x, fountain_y))
-        for _ in range(15):  # Aumentato da 12 a 15 per fumo molto denso
+        for _ in range(4):  # Poco fumo per non coprire l'effetto
             self.smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
 
     def update_fountain(self):
@@ -260,10 +263,10 @@ class BackgroundManager:
         fountain_x = SCREEN_WIDTH // 2
         fountain_y = SCREEN_HEIGHT // 2  # Centro schermo
         
-        # Genera nuove particelle (fontana ultra-ampia)
-        for _ in range(12):  # Aumentato da 10 a 12
+        # Genera nuove particelle (fontana di lava realistica)
+        for _ in range(8):  # Getto che si apre ai lati
             self.lava_particles.append(LavaParticle(fountain_x, fountain_y))
-        for _ in range(18):  # Aumentato da 15 a 18
+        for _ in range(5):  # Poco fumo per non coprire l'effetto
             self.smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
         
         # Aggiorna particelle esistenti

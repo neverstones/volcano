@@ -1,10 +1,12 @@
 import pygame
 import sys
+import random
 import time
 from constants import (SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GAME_TIME, 
                       MENU, PLAYING, GAME_OVER, SCORE_LIST, ENTER_NAME)
 from player import WobblyBall
 from platforms import PlatformManager
+from collectibles import Collectible
 from background_manager import BackgroundManager
 from levels import LevelManager, LEVEL_DEFS
 from enemies import EnemyManager, penalties
@@ -19,13 +21,67 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Volcano Wobbly Jump")
 clock = pygame.time.Clock()
 
+
 # --- Sistemi di gioco ---
 ui_system = UISystem()
+
+# --- Collezionabili ---
+collectibles = []
+
+def spawn_magma_bubbles_on_platforms():
+    """Posiziona una bolla di magma su ogni piattaforma di ogni livello, senza offset y."""
+    global collectibles
+    collectibles = []
+    for plat in platform_manager.platforms:
+        # Aggiungi la bolla solo se non esiste già una bolla associata a questa piattaforma
+        if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
+            x = plat.rect.centerx
+            y = plat.rect.top - 28  # Spazio maggiore sopra la piattaforma
+            bubble = Collectible(x, y, value=200)
+            bubble.type = 'magma_bubble'
+            bubble.platform = plat  # Associa la piattaforma
+            collectibles.append(bubble)
+
+def add_magma_bubble_for_platform(plat):
+    """Aggiunge una bolla di magma su ogni nuova piattaforma, senza offset y."""
+    # Aggiungi la bolla solo se non esiste già una bolla associata a questa piattaforma
+    if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
+        x = plat.rect.centerx
+        y = plat.rect.top - 28  # Spazio maggiore sopra la piattaforma
+        bubble = Collectible(x, y, value=200)
+        bubble.type = 'magma_bubble'
+        bubble.platform = plat  # Associa la piattaforma
+        collectibles.append(bubble)
+
+def update_collectibles(dt):
+    for c in collectibles:
+        c.update(dt)
+
+def draw_collectibles(screen, world_offset):
+    for c in collectibles:
+        c.draw(screen, world_offset)
+
+def check_collectibles_collision(player):
+    global collectibles
+    collected = 0
+    for c in collectibles:
+        if not c.collected and c.type == 'magma_bubble' and c.check_collision(player):
+            c.collected = True
+            c.trigger_float_text(f'+{c.value}')
+            collected += c.value
+    return collected
+
+def get_world_offset():
+    # Calcola l'offset verticale del mondo per disegnare i collezionabili
+    # Si basa sulla posizione del player e sullo scroll
+    return 0  # Se serve, puoi implementare uno scroll effettivo
+
 
 # --- Variabili globali ---
 total_scroll_distance = 0
 game_state = MENU
 final_score = 0
+score = 0  # Punteggio reale, parte da 0
 
 # Variabili per la vittoria
 victory_fountain_active = False
@@ -42,16 +98,14 @@ enemy_manager = None
 cooling_time = 0
 
 def calculate_score():
-    """Calcola il punteggio basato sulla distanza percorsa e tempo rimanente."""
-    distance_score = total_scroll_distance // 10  # 1 punto ogni 10 pixel
-    time_bonus = max(0, cooling_time) * 10  # Bonus tempo
-    return int(distance_score + time_bonus)
+    """Restituisce il punteggio reale basato solo sui collectibles raccolti."""
+    return score
 
 def init_game():
     """Inizializza una nuova partita."""
     global player, platform_manager, level_manager, background_manager, enemy_manager
     global total_scroll_distance, cooling_time, victory_fountain_active, fountain_start_time
-    global victory_timer
+    global victory_timer, score
     
     player = WobblyBall(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150)
     platform_manager = PlatformManager(num_platforms=10)
@@ -62,15 +116,19 @@ def init_game():
     # Collega il background manager al platform manager per i limiti del vulcano
     platform_manager.set_background_manager(background_manager)
     
+
     # Prima generazione piattaforme con livello
     platform_manager.generate_initial_platforms(player, level_manager)
     if platform_manager.platforms:
         first_platform = platform_manager.platforms[0]
         player.y = first_platform.rect.top - player.radius - 5
+
+    # Genera bolle di magma sulle piattaforme
+    spawn_magma_bubbles_on_platforms()
     
     total_scroll_distance = 0
     cooling_time = GAME_TIME
-    
+    score = 0
     # Reset vittoria
     victory_fountain_active = False
     fountain_start_time = 0
@@ -88,10 +146,9 @@ def update_fountain():
     fountain_x = SCREEN_WIDTH // 2
     fountain_y = SCREEN_HEIGHT // 2  # Al centro dello schermo
     
-    for _ in range(6):
+    for _ in range(10):
         fountain_particles.append(LavaParticle(fountain_x, fountain_y))
-    
-    for _ in range(4):
+    for _ in range(8):
         fountain_particles.append(SmokeParticle(fountain_x, fountain_y))
     
     # Aggiorna particelle esistenti
@@ -183,7 +240,7 @@ def update_game(dt):
     """Aggiorna la logica di gioco."""
     global total_scroll_distance, game_state, final_score, victory_fountain_active
     global fountain_start_time, victory_timer, cooling_time
-    
+
     if player is None:
         return
     
@@ -240,7 +297,12 @@ def update_game(dt):
             platform_manager.update(dy, level_manager)
             background_manager.update(dy, total_scroll_distance)
             total_scroll_distance += dy
-        
+
+            # Quando vengono aggiunte nuove piattaforme, aggiungi bolle di magma
+            for plat in platform_manager.platforms[-3:]:
+                if not any(abs(c.x - plat.rect.centerx) < 5 and abs(c.y - (plat.rect.top - 12)) < 5 for c in collectibles if c.type == 'magma_bubble'):
+                    add_magma_bubble_for_platform(plat)
+
         # Aggiorna livello in base alla posizione
         level_manager.update(total_scroll_distance)
 
@@ -259,7 +321,15 @@ def update_game(dt):
                 victory_fountain_active = True
                 victory_timer = 0.0
                 fountain_start_time = time.time()
-                print("🌋 Vittoria! Iniziata sequenza fontana")
+
+        # Aggiorna collezionabili
+        update_collectibles(dt)
+
+        # Gestione raccolta bolle di magma
+        global score
+        collected_score = check_collectibles_collision(player)
+        if collected_score > 0:
+            score += (collected_score // 200) * 100  # 100 punti per ogni bolla raccolta (valore 200)
 
         # Se la fontana è attiva, aggiorna timer (fontana gestita automaticamente nel background_manager)
         if victory_fountain_active:
@@ -286,6 +356,8 @@ def draw_game(screen):
     screen.fill((0, 0, 0))
     background_manager.draw(screen)
     platform_manager.draw(screen)
+    # Disegna le bolle di magma
+    draw_collectibles(screen, get_world_offset())
     
     # Se la fontana è attiva, non disegnare il player
     if not victory_fountain_active:
@@ -304,11 +376,11 @@ def draw_game(screen):
         # Livello e punteggio a sinistra
         text_level = font.render(f"Livello: {level_manager.get_current_level()['name']}", True, (255, 255, 255))
         screen.blit(text_level, (10, 10))
-        
+
         current_score = calculate_score()
         score_text = font.render(f"Punteggio: {current_score}", True, (255, 255, 255))
         screen.blit(score_text, (10, 40))
-        
+
         # Barra di raffreddamento in alto a destra
         draw_cooling_bar(screen, cooling_time, GAME_TIME)
     else:
@@ -316,7 +388,7 @@ def draw_game(screen):
         victory_text = font.render("🎉 CRATERE RAGGIUNTO! 🎉", True, (255, 215, 0))
         victory_rect = victory_text.get_rect(center=(SCREEN_WIDTH // 2, 50))
         screen.blit(victory_text, victory_rect)
-        
+
         time_left = max(0, 10 - int(victory_timer))  # Cambiato da 60 a 10
         timer_text = font.render(f"Inserimento nome tra: {time_left}s", True, (255, 255, 255))
         timer_rect = timer_text.get_rect(center=(SCREEN_WIDTH // 2, 80))
