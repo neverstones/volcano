@@ -35,16 +35,15 @@ class PlatformManager:
         self.background_manager = background_manager
     
     def get_volcano_platform_bounds(self, y_position):
-        """Ottiene i limiti per le piattaforme nel vulcano in base alla posizione Y."""
+        """Ottiene i limiti per le piattaforme nel vulcano in base alla posizione Y, usando le pareti del background."""
         if self.background_manager:
-            try:
-                left_wall, right_wall = self.background_manager.get_volcano_wall_positions(y_position)
-                # Aggiungi margine interno per le piattaforme
+            wall_data = self.background_manager.get_volcano_walls_at_y(y_position)
+            if wall_data:
                 margin = 20
-                return left_wall + margin, right_wall - margin
-            except:
-                pass
-        
+                return wall_data['left_wall_end'] + margin, wall_data['right_wall_start'] - margin
+            else:
+                # Se wall_data è None, siamo oltre il cratere: blocca la generazione
+                return None, None
         # Fallback ai limiti standard se non c'è il background manager
         return 50, SCREEN_WIDTH - 50
     
@@ -72,44 +71,57 @@ class PlatformManager:
             # Piattaforme normali per altri livelli (Mantello, Crosta)
             return Platform(x, y, w=PLATFORM_WIDTH, moving=random.random()<0.2)
 
-    def generate_initial_platforms(self, player, level_manager=None):
+    def generate_initial_platforms(self, player, level_manager=None, depth_multiplier=6):
         self.platforms=[]
-        
         current_level = level_manager.get_current_level()["name"] if level_manager else "Mantello"
-        
+        # Recupera il limite del cratere dal background manager se disponibile
+        crater_height = None
+        if self.background_manager and hasattr(self.background_manager, 'tiles_per_level'):
+            total_height = self.background_manager.tiles_per_level * SCREEN_HEIGHT
+            crater_height = total_height * 0.9
         # Crea sempre una piattaforma di partenza sotto il giocatore
         start_platform_x = player.x - PLATFORM_WIDTH // 2
-        
         # Adatta i limiti in base al livello
         if current_level == "Vulcano":
             left_bound, right_bound = self.get_volcano_platform_bounds(player.y + player.radius + 20)
-            start_platform_x = max(left_bound, min(start_platform_x, right_bound - PLATFORM_WIDTH))
+            if left_bound is None or right_bound is None:
+                return  # Non generare piattaforme oltre il cratere
+            passage_width = right_bound - left_bound
+            platform_width = min(PLATFORM_WIDTH - 15, 50, passage_width - 10)
+            if passage_width < 40 or platform_width < 30:
+                return  # Non generare piattaforme se lo spazio è troppo stretto
+            start_platform_x = max(left_bound, min(start_platform_x, right_bound - platform_width))
         else:
             start_platform_x = max(50, min(start_platform_x, SCREEN_WIDTH - PLATFORM_WIDTH - 50))
-            
         start_platform_y = player.y + player.radius + 20  # 20 pixel sotto il giocatore
         start_platform = self.generate_volcano_platform(start_platform_x, start_platform_y, current_level)
         self.platforms.append(start_platform)
-        
         # Genera le altre piattaforme con logica Doodle Jump (posizioni casuali)
         current_y = start_platform_y
-        
-        while current_y > -SCREEN_HEIGHT*3:
-            # Calcola la posizione Y della prossima piattaforma
+        # Profondità aumentata per generare più piattaforme in anticipo
+        max_depth = -SCREEN_HEIGHT * depth_multiplier
+        while current_y > max_depth:
             gap = random.randint(self.min_gap, self.max_gap)
             y = current_y - gap
-            
-            # Posizione X adattata al livello
+            # Blocca la generazione oltre il cratere
+            if crater_height is not None:
+                absolute_height = self.background_manager.volcano_total_scroll + (SCREEN_HEIGHT - y)
+                if absolute_height >= crater_height:
+                    break
             if current_level == "Vulcano":
                 left_bound, right_bound = self.get_volcano_platform_bounds(y)
-                platform_width = min(PLATFORM_WIDTH - 15, 50)
-                if right_bound - left_bound > platform_width + 20:
-                    x = random.randint(left_bound + 10, right_bound - platform_width - 10)
+                if left_bound is None or right_bound is None:
+                    break  # Non generare piattaforme oltre il cratere
+                passage_width = right_bound - left_bound
+                platform_width = min(PLATFORM_WIDTH - 15, 50, passage_width - 10)
+                if passage_width < 40 or platform_width < 30:
+                    break  # Non generare piattaforme se lo spazio è troppo stretto
+                if passage_width > platform_width + 20:
+                    x = random.randint(int(left_bound + 10), int(right_bound - platform_width - 10))
                 else:
-                    x = (left_bound + right_bound) // 2 - platform_width // 2
+                    x = int((left_bound + right_bound) // 2 - platform_width // 2)
             else:
                 x = random.randint(50, SCREEN_WIDTH - PLATFORM_WIDTH - 50)
-            
             platform = self.generate_volcano_platform(x, y, current_level)
             self.platforms.append(platform)
             current_y = y
@@ -137,49 +149,55 @@ class PlatformManager:
             else:
                 highest_y = min(p.rect.y for p in self.platforms)
                 gap = random.randint(self.min_gap, self.max_gap)
-                
                 # Controllo sicurezza: se non ci sono piattaforme raggiungibili nelle ultime 3,
                 # genera una piattaforma raggiungibile
                 recent_platforms = [p for p in self.platforms if p.rect.y > highest_y + self.max_gap * 2]
                 needs_reachable_platform = len(recent_platforms) < 1
-                
                 y = highest_y - gap
-                
+                # Blocca la generazione oltre il cratere anche in update
+                crater_height = None
+                if self.background_manager and hasattr(self.background_manager, 'tiles_per_level'):
+                    total_height = self.background_manager.tiles_per_level * SCREEN_HEIGHT
+                    crater_height = total_height * 0.9
+                if current_level == "Vulcano" and crater_height is not None:
+                    absolute_height = self.background_manager.volcano_total_scroll + (SCREEN_HEIGHT - y)
+                    if absolute_height >= crater_height:
+                        break
                 if current_level == "Vulcano":
-                    # Logica specifica per il vulcano
                     left_bound, right_bound = self.get_volcano_platform_bounds(y)
-                    platform_width = min(PLATFORM_WIDTH - 15, 50)
-                    
+                    if left_bound is None or right_bound is None:
+                        break
+                    passage_width = right_bound - left_bound
+                    platform_width = min(PLATFORM_WIDTH - 15, 50, passage_width - 10)
+                    if passage_width < 40 or platform_width < 30:
+                        break
+                    # Cast a int per tutti i parametri
+                    left_bound = int(left_bound)
+                    right_bound = int(right_bound)
+                    platform_width = int(platform_width)
                     if needs_reachable_platform and len(self.platforms) > 1:
-                        # Posizione raggiungibile al centro del passaggio
-                        center_x = (left_bound + right_bound) // 2
-                        max_reach = min(150, (right_bound - left_bound) // 3)
-                        x_start = max(left_bound + 10, center_x - max_reach)
-                        x_end = min(right_bound - platform_width - 10, center_x + max_reach)
+                        center_x = int((left_bound + right_bound) // 2)
+                        max_reach = int(min(150, (right_bound - left_bound) // 3))
+                        x_start = max(int(left_bound + 10), center_x - max_reach)
+                        x_end = min(int(right_bound - platform_width - 10), center_x + max_reach)
                         if x_end > x_start:
                             x = random.randint(x_start, x_end)
                         else:
                             x = center_x - platform_width // 2
                     else:
-                        # Posizione casuale nel passaggio del vulcano
                         if right_bound - left_bound > platform_width + 20:
-                            x = random.randint(left_bound + 10, right_bound - platform_width - 10)
+                            x = random.randint(int(left_bound + 10), int(right_bound - platform_width - 10))
                         else:
-                            x = (left_bound + right_bound) // 2 - platform_width // 2
+                            x = int((left_bound + right_bound) // 2 - platform_width // 2)
                 else:
-                    # Logica per mantello e crosta
                     if needs_reachable_platform and len(self.platforms) > 1:
-                        # Trova una posizione raggiungibile dal centro dello schermo
                         center_x = SCREEN_WIDTH // 2
-                        max_reach = 200  # Distanza massima raggiungibile
+                        max_reach = 200
                         x_start = max(50, center_x - max_reach)
                         x_end = min(SCREEN_WIDTH - PLATFORM_WIDTH - 50, center_x + max_reach)
-                        x = random.randint(x_start, x_end)
+                        x = random.randint(int(x_start), int(x_end))
                     else:
-                        # Posizione completamente casuale (stile Doodle Jump)
                         x = random.randint(50, SCREEN_WIDTH - PLATFORM_WIDTH - 50)
-            
-            # Aggiungi la nuova piattaforma
             new_platform = self.generate_volcano_platform(x, y, current_level)
             self.platforms.append(new_platform)
             added_platforms += 1

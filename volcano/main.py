@@ -117,8 +117,8 @@ def init_game():
     platform_manager.set_background_manager(background_manager)
     
 
-    # Prima generazione piattaforme con livello
-    platform_manager.generate_initial_platforms(player, level_manager)
+    # Prima generazione piattaforme con livello (più profonda, stile Doodle Jump)
+    platform_manager.generate_initial_platforms(player, level_manager, depth_multiplier=8)
     if platform_manager.platforms:
         first_platform = platform_manager.platforms[0]
         player.y = first_platform.rect.top - player.radius - 5
@@ -243,6 +243,9 @@ def update_game(dt):
 
     if player is None:
         return
+
+    # Aggiorna SEMPRE il movimento delle piattaforme mobili (anche senza scroll)
+    platform_manager.update(0, level_manager)
     
     # Controlla se ha raggiunto il cratere
     if background_manager and background_manager.check_crater_reached(total_scroll_distance):
