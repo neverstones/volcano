@@ -1,34 +1,17 @@
 [
   {
-    "score": 6150,
-    "player_name": "Alex",
-    "level_reached": 2,
-    "collectibles_collected": 0,
-    "date": "2025-09-11 14:19:30"
+    "name": "Alex",
+    "score": 3458,
+    "date": "2025-09-12 10:53:41"
   },
   {
-    "score": 4950,
-    "level_reached": 2,
-    "collectibles_collected": 0,
-    "date": "2025-09-11 10:22:30"
+    "name": "Alex",
+    "score": 3366,
+    "date": "2025-09-12 10:58:33"
   },
   {
-    "score": 4350,
-    "player_name": "Alessio",
-    "level_reached": 2,
-    "collectibles_collected": 0,
-    "date": "2025-09-11 14:02:30"
-  },
-  {
-    "score": 4050,
-    "level_reached": 2,
-    "collectibles_collected": 0,
-    "date": "2025-09-10 17:55:20"
-  },
-  {
-    "score": 3200,
-    "level_reached": 2,
-    "collectibles_collected": 0,
-    "date": "2025-09-10 18:07:38"
+    "name": "Alessio",
+    "score": 3008,
+    "date": "2025-09-12 10:37:14"
   }
 ]

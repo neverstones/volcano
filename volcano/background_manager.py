@@ -151,8 +151,22 @@ class BackgroundManager:
                 'height_from_base': height_from_base
             })
 
-    def update(self, dy):
-        """Scroll verticale dei tile."""
+    def update(self, dy, total_scroll_distance=0):
+        """Scroll verticale dei tile e aggiornamento livello."""
+        
+        # Determina il livello corrente in base alla distanza percorsa
+        # Ogni livello è lungo circa 2000 pixel (constants.LEVEL_HEIGHT)
+        LEVEL_HEIGHT = 2000
+        new_level_index = min(int(total_scroll_distance // LEVEL_HEIGHT), len(self.level_images) - 1)
+        
+        # Se cambiamo livello, stampa il debug
+        if new_level_index != self.current_index:
+            level_names = ["Mantello", "Crosta", "Vulcano"]
+            old_name = level_names[self.current_index] if self.current_index < len(level_names) else "Sconosciuto"
+            new_name = level_names[new_level_index] if new_level_index < len(level_names) else "Sconosciuto"
+            print(f"🌍 Cambio livello: {old_name} → {new_name} (scroll: {total_scroll_distance})")
+            self.current_index = new_level_index
+        
         # Traccia lo scroll assoluto nel vulcano
         if self.current_index == self.volcano_level_index:
             self.volcano_total_scroll += dy
@@ -196,6 +210,27 @@ class BackgroundManager:
             
         return False
 
+    def _particle_should_stay(self, particle):
+        """Determina se una particella dovrebbe rimanere attiva o essere rimossa."""
+        # Se esce dal fondo dello schermo, rimuovila
+        if particle.y > SCREEN_HEIGHT + 50:
+            return False
+        
+        # Se la particella ha un fade_factor troppo basso, rimuovila
+        if hasattr(particle, 'fade_factor') and particle.fade_factor <= 0.01:
+            return False
+        
+        # Se la particella sta cadendo (velocità positiva) e ha superato una certa altezza
+        if particle.vy > 0 and particle.y > SCREEN_HEIGHT // 2:
+            # Controlla se è all'interno dell'area del cratere
+            walls = self.get_volcano_walls_at_y(particle.y)
+            if walls is not None:
+                # Se ci sono pareti e la particella è fuori dal passaggio, rimuovila
+                if particle.x < walls['left_wall_end'] or particle.x > walls['right_wall_start']:
+                    return False
+        
+        return True
+
     def update_fountain_continuous(self):
         """Aggiorna le particelle della fontana in modo continuo quando è attiva."""
         if not self.fountain_active:
@@ -207,17 +242,17 @@ class BackgroundManager:
         for p in self.smoke_particles:
             p.update()
         
-        # Rimuovi particelle vecchie
-        self.lava_particles = [p for p in self.lava_particles if p.y < SCREEN_HEIGHT + 50]
+        # Rimuovi particelle vecchie e quelle che toccano i bordi del vulcano
+        self.lava_particles = [p for p in self.lava_particles if self._particle_should_stay(p)]
         self.smoke_particles = [p for p in self.smoke_particles if p.age < p.max_age]
         
-        # Genera nuove particelle continuamente (ridotto per fontana più contenuta)
+        # Genera nuove particelle continuamente (fontana ultra-ampia)
         fountain_x = SCREEN_WIDTH // 2
         fountain_y = SCREEN_HEIGHT // 2  # Centro schermo
         
-        for _ in range(4):  # Ridotto da 6 a 4
+        for _ in range(10):  # Aumentato da 8 a 10 per fontana ultra-densa
             self.lava_particles.append(LavaParticle(fountain_x, fountain_y))
-        for _ in range(5):  # Ridotto da 8 a 5
+        for _ in range(15):  # Aumentato da 12 a 15 per fumo molto denso
             self.smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
 
     def update_fountain(self):
@@ -225,10 +260,10 @@ class BackgroundManager:
         fountain_x = SCREEN_WIDTH // 2
         fountain_y = SCREEN_HEIGHT // 2  # Centro schermo
         
-        # Genera nuove particelle
-        for _ in range(6):
+        # Genera nuove particelle (fontana ultra-ampia)
+        for _ in range(12):  # Aumentato da 10 a 12
             self.lava_particles.append(LavaParticle(fountain_x, fountain_y))
-        for _ in range(8):
+        for _ in range(18):  # Aumentato da 15 a 18
             self.smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
         
         # Aggiorna particelle esistenti
@@ -237,8 +272,8 @@ class BackgroundManager:
         for p in self.smoke_particles:
             p.update()
         
-        # Rimuovi particelle vecchie
-        self.lava_particles = [p for p in self.lava_particles if p.y < SCREEN_HEIGHT + 50]
+        # Rimuovi particelle vecchie e quelle che toccano i bordi del vulcano
+        self.lava_particles = [p for p in self.lava_particles if self._particle_should_stay(p)]
         self.smoke_particles = [p for p in self.smoke_particles if p.age < p.max_age]
 
     def draw(self, screen):

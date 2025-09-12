@@ -29,6 +29,7 @@ class LevelManager:
         section_height = LEVEL_HEIGHT // sections_per_level  # 2000 / 3 ≈ 666
         
         level_index = int(abs(player_y) // LEVEL_HEIGHT)
+        
         if level_index < len(self.level_defs):
             self.current_index = level_index
         else:
