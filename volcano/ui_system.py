@@ -24,13 +24,36 @@ class UISystem:
         
         # Menu principale
         self.menu_selected = 0
-        self.menu_options = ["Gioca", "Classifiche", "Esci"]
-        
-        # Input nome
+        self.menu_options = ["Gioca", "Come si gioca", "Classifiche", "Esci"]
+
+        # Stato input/cursore sempre inizializzato
         self.input_text = ""
-        self.input_active = False
+        self.input_active = True
         self.cursor_visible = True
         self.cursor_timer = 0
+    def draw_how_to_play(self, screen):
+        """Schermata di spiegazione del gioco."""
+        screen.fill(self.black)
+        title = self.font_big.render("COME SI GIOCA", True, self.orange)
+        title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, 100))
+        screen.blit(title, title_rect)
+
+        lines = [
+            "Sei una goccia di magma che deve risalire il vulcano!",
+            "Salta sulle piattaforme evitando di cadere.",
+            "Raccogli le bolle di magma per aumentare il punteggio.",
+            "Evita i nemici (i minerali): se li tocchi il raffreddamento accelera!",
+            "Raggiungi il cratere per vincere!",
+            "",
+            "Barra di raffreddamento: se si esaurisce perdi.",
+            "Usa le FRECCE per muoverti.",
+            "",
+            "Premi ESC per tornare al menu."
+        ]
+        for i, line in enumerate(lines):
+            text = self.font_small.render(line, True, self.white)
+            text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, 180 + i * 40))
+            screen.blit(text, text_rect)
         
     def draw_menu(self, screen):
         """Disegna il menu principale."""

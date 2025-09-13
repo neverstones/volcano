@@ -2,75 +2,8 @@ import pygame
 import math
 import random
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT
+from fountain import Fountain
 
-def lerp_color(c1, c2, t):
-    """Interpola tra due colori."""
-    return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
-
-# --- Particelle lava (fontana) ---
-class LavaParticle:
-    def __init__(self, x, y):
-        self.x = x + random.uniform(-20, 20)    # Dispersione per caduta laterale
-        self.y = y
-        self.vx = random.uniform(-10.0, 10.0)   # Velocità orizzontale per arco
-        self.vy = random.uniform(-50, -25)      # Velocità verticale per getto alto
-        self.radius = random.uniform(5, 9)      # Dimensioni moderate
-        self.trail = []
-        self.max_trail = 35                     # Scia per vedere traiettoria
-
-    def update(self):
-        gravity = 0.12  # Gravità ridotta per arco più ampio
-        self.vy += gravity
-        self.x += self.vx
-        self.y += self.vy
-
-        # Trail
-        self.trail.insert(0, (self.x,self.y))
-        if len(self.trail) > self.max_trail:
-            self.trail.pop()
-
-    def draw(self, surf):
-        L = len(self.trail)
-        for i,(tx,ty) in enumerate(self.trail):
-            t = i/max(1,L-1)
-            if t < 0.5:
-                col = lerp_color((255,165,0),(255,0,0), t*2)
-            else:
-                col = lerp_color((255,0,0),(80,80,80), (t-0.5)*2)
-            alpha = int(255*(1-t))
-            size = int(self.radius*(0.5 + 0.5*(1-t)))
-            s = pygame.Surface((size*2,size*2), pygame.SRCALPHA)
-            pygame.draw.circle(s, (*col, alpha), (size,size), size)
-            surf.blit(s, (tx-size, ty-size))
-
-# --- Particelle fumo (plume aeriforme largo) ---
-class SmokeParticle:
-    def __init__(self, x, y):
-        self.x = x + random.uniform(-50, 50)    # Dispersione limitata
-        self.y = y - 25                         # Altezza contenuta
-        self.vx = random.uniform(-4.0, 4.0)     # Velocità orizzontale limitata
-        self.vy = random.uniform(-10.0, -5.0)   # Velocità verticale moderata
-        self.radius = random.uniform(10, 18)    # Nuvole piccole
-        self.age = 0
-        self.max_age = random.randint(120, 160) # Durata più breve
-
-    def update(self):
-        # sale verso l'alto con dispersione
-        self.x += self.vx + math.sin(self.age*0.05)*0.2
-        self.y += self.vy
-        self.age += 1
-
-        # allargamento colonna con l'altezza
-        self.radius *= 1.002
-
-    def draw(self, surf):
-        alpha = max(0, int(200 * (1 - self.age/self.max_age)))
-        if alpha <= 0:
-            return
-        size = int(self.radius)
-        s = pygame.Surface((size*2,size*2), pygame.SRCALPHA)
-        pygame.draw.circle(s, (40,40,40,alpha), (size,size), size)
-        surf.blit(s, (self.x-size, self.y-size))
 
 class BackgroundManager:
     def __init__(self):
@@ -104,9 +37,8 @@ class BackgroundManager:
         
         # Fontana di lava per il cratere
         self.fountain_active = False
-        self.crater_mode = False  # Modalità cratere: niente pareti, niente goccia, solo fontana
-        self.lava_particles = []
-        self.smoke_particles = []
+        self.crater_mode = False
+        self.fountain = None
 
         # Parametri per il cono vulcanico (solo nel livello 2 - Vulcano)
         self.volcano_level_index = 2  # Livello vulcano
@@ -213,71 +145,22 @@ class BackgroundManager:
     def _particle_should_stay(self, particle):
         """Determina se una particella dovrebbe rimanere attiva o essere rimossa."""
         # Se esce dal fondo dello schermo, rimuovila
-        if particle.y > SCREEN_HEIGHT + 100:  # Aumentato margine da +50 a +100
+        if particle.y > SCREEN_HEIGHT + 100:
             return False
-        
+
         # Se la particella ha un fade_factor troppo basso, rimuovila
         if hasattr(particle, 'fade_factor') and particle.fade_factor <= 0.01:
             return False
-        
-        # Se siamo nel vulcano, limita le particelle alle pareti
+
+        # Se siamo nel vulcano, consenti alle particelle della fontana di atterrare ovunque (nessun limite laterale né centrale)
         if self.current_index == self.volcano_level_index:
-            walls = self.get_volcano_walls_at_y(particle.y)
-            if walls is not None:
-                # Le particelle non devono uscire dalle pareti del vulcano
-                if particle.x < walls['left_wall_end'] or particle.x > walls['right_wall_start']:
-                    return False
+            return True
         else:
             # Negli altri livelli, usa margini più ampi
             if particle.x < -200 or particle.x > SCREEN_WIDTH + 200:
                 return False
-        
         return True
 
-    def update_fountain_continuous(self):
-        """Aggiorna le particelle della fontana in modo continuo quando è attiva."""
-        if not self.fountain_active:
-            return
-            
-        # Aggiorna particelle esistenti
-        for p in self.lava_particles:
-            p.update()
-        for p in self.smoke_particles:
-            p.update()
-        
-        # Rimuovi particelle vecchie e quelle che toccano i bordi del vulcano
-        self.lava_particles = [p for p in self.lava_particles if self._particle_should_stay(p)]
-        self.smoke_particles = [p for p in self.smoke_particles if p.age < p.max_age]
-        
-        # Genera nuove particelle continuamente (fontana ultra-ampia)
-        fountain_x = SCREEN_WIDTH // 2
-        fountain_y = SCREEN_HEIGHT // 2  # Centro schermo
-        
-        for _ in range(7):  # Più particelle per fontana di lava realistica
-            self.lava_particles.append(LavaParticle(fountain_x, fountain_y))
-        for _ in range(4):  # Poco fumo per non coprire l'effetto
-            self.smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
-
-    def update_fountain(self):
-        """Aggiorna le particelle della fontana di lava."""
-        fountain_x = SCREEN_WIDTH // 2
-        fountain_y = SCREEN_HEIGHT // 2  # Centro schermo
-        
-        # Genera nuove particelle (fontana di lava realistica)
-        for _ in range(8):  # Getto che si apre ai lati
-            self.lava_particles.append(LavaParticle(fountain_x, fountain_y))
-        for _ in range(5):  # Poco fumo per non coprire l'effetto
-            self.smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
-        
-        # Aggiorna particelle esistenti
-        for p in self.lava_particles:
-            p.update()
-        for p in self.smoke_particles:
-            p.update()
-        
-        # Rimuovi particelle vecchie e quelle che toccano i bordi del vulcano
-        self.lava_particles = [p for p in self.lava_particles if self._particle_should_stay(p)]
-        self.smoke_particles = [p for p in self.smoke_particles if p.age < p.max_age]
 
     def draw(self, screen):
         """Disegna tutti i tile del livello corrente e le pareti del cono vulcanico se necessario."""
@@ -286,10 +169,13 @@ class BackgroundManager:
         # Nel vulcano, usa un sistema di background composito
         if idx == self.volcano_level_index:
             self.draw_volcano_backgrounds(screen)
-            # Aggiorna e disegna la fontana se attiva (in loop continuo)
+            # Fontana centralizzata: aggiorna e disegna se attiva
             if self.fountain_active:
-                self.update_fountain_continuous()
-                self.draw_fountain(screen)
+                if self.fountain is None:
+                    self.fountain = Fountain(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                self.fountain.emit()
+                self.fountain.update()
+                self.fountain.draw(screen)
         else:
             # Altri livelli: disegna normalmente
             for offset in self.tile_offsets[idx]:
@@ -399,38 +285,35 @@ class BackgroundManager:
                     # Più si sale (y diminuisce), più il cono si restringe
                     absolute_height = self.volcano_total_scroll + (SCREEN_HEIGHT - y)
                     absolute_height = max(0, min(absolute_height, total_height))
-                    
                     # Non disegnare pareti se siamo al cratere (zona dritta)
                     if absolute_height >= crater_height:
                         continue  # Salta questo tile, siamo nel cratere
-                    
                     passage_width = base_width - (width_reduction_per_pixel * absolute_height)
                     passage_width = max(crater_width, min(passage_width, base_width))
-                    
                     # Centro dello schermo per simmetria perfetta
                     center = SCREEN_WIDTH / 2
                     half_passage = passage_width / 2
-                    
                     left_wall_end = int(center - half_passage)
                     right_wall_start = int(center + half_passage)
-                    
-                    # Assicura coordinate valide
-                    left_wall_end = max(0, left_wall_end)
-                    right_wall_start = min(SCREEN_WIDTH, right_wall_start)
-                    
                     # Disegna parete sinistra (solo 2 tile di spessore)
                     tiles_left = min(2, left_wall_end // tile_w)  # Massimo 2 tile
                     for i in range(tiles_left):
                         x = left_wall_end - (i + 1) * tile_w  # Parte dal bordo interno
                         if x >= 0:  # Solo se dentro lo schermo
                             screen.blit(self.wall_tile, (x, y))
-                    
                     # Disegna parete destra (solo 2 tile di spessore, speculare)
                     tiles_right = min(2, (SCREEN_WIDTH - right_wall_start) // tile_w)  # Massimo 2 tile
                     for i in range(tiles_right):
                         x = right_wall_start + i * tile_w  # Parte dal bordo interno
                         if x < SCREEN_WIDTH:  # Solo se dentro lo schermo
                             screen.blit(self.wall_tile, (x, y))
+        # Fontana centralizzata: aggiorna e disegna se attiva
+        if self.fountain_active:
+            if self.fountain is None:
+                self.fountain = Fountain(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+            self.fountain.emit()
+            self.fountain.update()
+            self.fountain.draw(screen)
 
     def get_volcano_walls_at_y(self, y_position):
         """Restituisce le coordinate delle pareti del vulcano alla posizione Y specificata."""
@@ -522,7 +405,6 @@ class BackgroundManager:
         self.landscape_scroll = 0  # Reset scroll paesaggio
         self.fountain_active = False  # Reset fontana
         self.crater_mode = False  # Reset modalità cratere
-        self.lava_particles = []
-        self.smoke_particles = []
+    # Fountain centralizzata: nessuna lista particelle qui
         for i in range(len(self.tile_offsets)):
             self.tile_offsets[i] = [j * SCREEN_HEIGHT for j in range(self.tiles_per_level)]

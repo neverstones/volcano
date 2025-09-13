@@ -12,7 +12,7 @@ from levels import LevelManager, LEVEL_DEFS
 from enemies import EnemyManager, penalties
 from ui_system import UISystem
 from save_system import add_score
-from fountain import LavaParticle, SmokeParticle
+from fountain import Fountain
 import game_states
 
 # --- Inizializza pygame ---
@@ -23,7 +23,9 @@ clock = pygame.time.Clock()
 
 
 # --- Sistemi di gioco ---
+
 ui_system = UISystem()
+HOW_TO_PLAY = 10  # nuovo stato menu
 
 
 # --- Collezionabili ---
@@ -102,8 +104,8 @@ score = 0  # Punteggio reale, parte da 0
 # Variabili per la vittoria
 victory_fountain_active = False
 fountain_start_time = 0
-fountain_particles = []
 victory_timer = 0
+fountain = None
 
 # --- Istanze oggetti di gioco (create quando si inizia a giocare) ---
 player = None
@@ -148,46 +150,10 @@ def init_game():
     # Reset vittoria
     victory_fountain_active = False
     fountain_start_time = 0
-    fountain_particles = []
     victory_timer = 0
+    global fountain
+    fountain = None
 
-def update_fountain():
-    """Aggiorna l'effetto fontana di vittoria."""
-    global fountain_particles
-    
-    if not victory_fountain_active:
-        return
-
-    # Genera nuove particelle (getto largo e fumo largo)
-    fountain_x = SCREEN_WIDTH // 2
-    fountain_y = SCREEN_HEIGHT // 2  # Al centro dello schermo
-
-    for _ in range(6):
-        fountain_particles.append(LavaParticle(fountain_x, fountain_y))
-    for _ in range(8):
-        fountain_particles.append(SmokeParticle(fountain_x, fountain_y))
-
-    # Aggiorna particelle esistenti
-    for particle in fountain_particles:
-        particle.update()
-
-    # Rimuovi particelle vecchie
-    fountain_particles = [p for p in fountain_particles 
-                         if (hasattr(p, 'age') and p.age < p.max_age) or (hasattr(p, 'y') and p.y < SCREEN_HEIGHT + 50)]
-
-def draw_fountain(screen):
-    """Disegna l'effetto fontana."""
-    if not victory_fountain_active:
-        return
-
-    # Disegna prima il fumo, poi la lava (come nel nuovo sistema)
-    smoke_particles = [p for p in fountain_particles if hasattr(p, 'age')]
-    lava_particles = [p for p in fountain_particles if not hasattr(p, 'age')]
-
-    for p in smoke_particles:
-        p.draw(screen)
-    for p in lava_particles:
-        p.draw(screen)
 
 def draw_cooling_bar(screen, current_time, max_time):
     """Disegna la barra di raffreddamento in alto a destra."""
@@ -266,13 +232,16 @@ def update_game(dt):
         if not victory_fountain_active:
             victory_fountain_active = True
             fountain_start_time = time.time()
+            global fountain
+            fountain = Fountain(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
             print("🎉 VITTORIA! Cratere raggiunto!")
     
-    # Se la fontana è attiva, aggiorna il timer della vittoria
+    # Se la fontana è attiva, aggiorna il timer della vittoria e la fontana
     if victory_fountain_active:
         victory_timer = time.time() - fountain_start_time
-        # La fontana viene aggiornata automaticamente nel background_manager.draw()
-        
+        if fountain is not None:
+            fountain.emit()
+            fountain.update()
         # Dopo 10 secondi mostra schermata inserimento nome
         if victory_timer >= 10:  # Cambiato da 60 a 10 secondi
             final_score = calculate_score()
@@ -394,7 +363,9 @@ def draw_game(screen):
         player.draw_wobbly(screen, pygame.time.get_ticks() / 1000.0)
         enemy_manager.draw(screen)
     
-    # La fontana viene disegnata automaticamente nel background_manager.draw()
+    # Disegna la fontana di vittoria se attiva
+    if victory_fountain_active and fountain is not None:
+        fountain.draw(screen)
 
     # HUD
     font = pygame.font.SysFont(None, 30)
@@ -440,16 +411,17 @@ while running:
             if action == 0:  # Gioca
                 init_game()
                 game_state = PLAYING
-            elif action == 1:  # Classifiche
+            elif action == 1:  # Come si gioca
+                game_state = HOW_TO_PLAY
+            elif action == 2:  # Classifiche
                 game_state = SCORE_LIST
-            elif action == 2:  # Esci
+            elif action == 3:  # Esci
                 running = False
         
         elif game_state == PLAYING:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE and not victory_fountain_active:
-                    player.jump()
-                elif event.key == pygame.K_ESCAPE:
+                # Salto con SPAZIO disabilitato temporaneamente
+                if event.key == pygame.K_ESCAPE:
                     game_state = MENU
         
         elif game_state == GAME_OVER:
@@ -467,10 +439,37 @@ while running:
         
         elif game_state == ENTER_NAME:
             if ui_system.handle_name_input(event):
-                # Salva il punteggio
-                add_score(ui_system.input_text.strip(), final_score)
-                ui_system.reset_input()
-                game_state = SCORE_LIST
+                from save_system import add_score, force_add_score, add_score_with_number
+                name = ui_system.input_text.strip()
+                result, scores = add_score(name, final_score)
+                if result == 'duplicate':
+                    import pygame
+                    font = pygame.font.SysFont(None, 32)
+                    msg = f"Il nome '{name}' esiste già. Sovrascrivere? (S/N)"
+                    text_surf = font.render(msg, True, (255,255,0))
+                    screen.blit(text_surf, (50, 200))
+                    pygame.display.flip()
+                    waiting = True
+                    while waiting:
+                        for event in pygame.event.get():
+                            if event.type == pygame.KEYDOWN:
+                                if event.key == pygame.K_s:
+                                    force_add_score(name, final_score)
+                                    ui_system.reset_input()
+                                    game_state = SCORE_LIST
+                                    waiting = False
+                                elif event.key == pygame.K_n:
+                                    add_score_with_number(name, final_score)
+                                    ui_system.reset_input()
+                                    game_state = SCORE_LIST
+                                    waiting = False
+                else:
+                    # Nome non duplicato, salva normalmente
+                    ui_system.reset_input()
+                    game_state = SCORE_LIST
+        elif game_state == HOW_TO_PLAY:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                game_state = MENU
     
     # --- Aggiornamenti ---
     if game_state == PLAYING:
@@ -479,50 +478,22 @@ while running:
     # --- Rendering ---
     if game_state == MENU:
         ui_system.draw_menu(screen)
-    
+    elif game_state == HOW_TO_PLAY:
+        ui_system.draw_how_to_play(screen)
     elif game_state == PLAYING:
         draw_game(screen)
-    
     elif game_state == GAME_OVER:
         if player is not None:
             draw_game(screen)  # Mostra il gioco in background
         ui_system.draw_game_over(screen)
-    
     elif game_state == SCORE_LIST:
         ui_system.draw_scores(screen)
-    
     elif game_state == ENTER_NAME:
         if player is not None:
             draw_game(screen)  # Mostra il gioco in background
         ui_system.draw_name_input(screen, final_score)
 
-    # Gestione salvataggio punteggio con nomi duplicati
-    if game_state == ENTER_NAME and ui_system.input_text.strip():
-        from save_system import add_score, force_add_score, add_score_with_number
-        name = ui_system.input_text.strip()
-        result, scores = add_score(name, final_score)
-        if result == 'duplicate':
-            # Chiedi all'utente se vuole sovrascrivere o rinominare
-            import pygame
-            font = pygame.font.SysFont(None, 32)
-            msg = f"Il nome '{name}' esiste già. Sovrascrivere? (S/N)"
-            text_surf = font.render(msg, True, (255,255,0))
-            screen.blit(text_surf, (50, 200))
-            pygame.display.flip()
-            waiting = True
-            while waiting:
-                for event in pygame.event.get():
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_s:
-                            force_add_score(name, final_score)
-                            ui_system.reset_input()
-                            game_state = SCORE_LIST
-                            waiting = False
-                        elif event.key == pygame.K_n:
-                            add_score_with_number(name, final_score)
-                            ui_system.reset_input()
-                            game_state = SCORE_LIST
-                            waiting = False
+    # (RIMOSSO: la verifica duplicati ora avviene solo dopo INVIO)
     
     pygame.display.flip()
 
