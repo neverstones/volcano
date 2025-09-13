@@ -10,11 +10,21 @@ class Platform(pygame.sprite.Sprite):
         self.moving = moving
         self.speed = random.choice([-2,2]) if moving else 0
 
-    def update(self):
+    def update(self, volcano_bounds=None):
         if self.moving:
             self.rect.x += self.speed
-            if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
-                self.speed *= -1
+            # Se sono forniti i limiti del vulcano, usali per il rimbalzo
+            if volcano_bounds is not None:
+                left, right = volcano_bounds
+                if self.rect.left < left:
+                    self.rect.left = left
+                    self.speed *= -1
+                elif self.rect.right > right:
+                    self.rect.right = right
+                    self.speed *= -1
+            else:
+                if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
+                    self.speed *= -1
 
     def draw(self, screen):
         screen.blit(self.image, self.rect.topleft)
@@ -134,12 +144,20 @@ class PlatformManager:
         removed_platforms = 0
         for plat in list(self.platforms):
             plat.rect.y += dy
-            plat.update()
+            # Se siamo nel vulcano e la piattaforma è mobile, passa i limiti delle pareti
+            if level_manager and level_manager.get_current_level()["name"] == "Vulcano" and plat.moving:
+                left_bound, right_bound = self.get_volcano_platform_bounds(plat.rect.y)
+                if left_bound is not None and right_bound is not None:
+                    plat.update(volcano_bounds=(int(left_bound), int(right_bound)))
+                else:
+                    plat.update()
+            else:
+                plat.update()
             if plat.rect.top > SCREEN_HEIGHT:
                 self.platforms.remove(plat)
                 removed_platforms += 1
         
-        # Genera nuove piattaforme se necessario
+        # Genera nuove piattaforme se necessario (on demand, tutti i livelli)
         added_platforms = 0
         while len(self.platforms) < self.num_platforms:
             if not self.platforms:
@@ -201,7 +219,6 @@ class PlatformManager:
             new_platform = self.generate_volcano_platform(x, y, current_level)
             self.platforms.append(new_platform)
             added_platforms += 1
-            
         # Debug: stampa informazioni solo se ci sono stati cambiamenti significativi
         if removed_platforms > 2 or added_platforms > 2:
             highest_y = min(p.rect.y for p in self.platforms) if self.platforms else "N/A"

@@ -25,39 +25,55 @@ clock = pygame.time.Clock()
 # --- Sistemi di gioco ---
 ui_system = UISystem()
 
+
 # --- Collezionabili ---
 collectibles = []
+# Flag per bloccare la generazione on demand subito dopo cambio livello
+block_on_demand_collectibles = False
 
 def spawn_magma_bubbles_on_platforms():
     """Posiziona una bolla di magma su ogni piattaforma di ogni livello, senza offset y."""
     global collectibles
     collectibles = []
     for plat in platform_manager.platforms:
-        # Aggiungi la bolla solo se non esiste già una bolla associata a questa piattaforma
+        # Solo su alcune piattaforme (es. 40% di probabilità)
+        if random.random() < 0.4:
+            if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
+                x = plat.rect.centerx
+                # Posiziona la bolla completamente sopra la piattaforma lasciando uno spazio
+                radius = 10  # Deve corrispondere a Collectible.radius
+                offset = 16  # Spazio extra tra piattaforma e bolla
+                y = plat.rect.top - offset - radius
+                bubble = Collectible(x, y, value=200)
+                bubble.type = 'magma_bubble'
+                bubble.platform = plat  # Associa la piattaforma
+                collectibles.append(bubble)
+
+def add_magma_bubble_for_platform(plat):
+    """Aggiunge una bolla di magma su ogni nuova piattaforma, senza offset y."""
+    # Solo su alcune piattaforme (es. 40% di probabilità)
+    if random.random() < 0.4:
         if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
             x = plat.rect.centerx
-            y = plat.rect.top - 28  # Spazio maggiore sopra la piattaforma
+            radius = 10  # Deve corrispondere a Collectible.radius
+            offset = 16  # Spazio extra tra piattaforma e bolla
+            y = plat.rect.top - offset - radius
             bubble = Collectible(x, y, value=200)
             bubble.type = 'magma_bubble'
             bubble.platform = plat  # Associa la piattaforma
             collectibles.append(bubble)
-
-def add_magma_bubble_for_platform(plat):
-    """Aggiunge una bolla di magma su ogni nuova piattaforma, senza offset y."""
-    # Aggiungi la bolla solo se non esiste già una bolla associata a questa piattaforma
-    if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
-        x = plat.rect.centerx
-        y = plat.rect.top - 28  # Spazio maggiore sopra la piattaforma
-        bubble = Collectible(x, y, value=200)
-        bubble.type = 'magma_bubble'
-        bubble.platform = plat  # Associa la piattaforma
-        collectibles.append(bubble)
 
 def update_collectibles(dt):
     for c in collectibles:
         c.update(dt)
 
 def draw_collectibles(screen, world_offset):
+    # Rimuovi collectibles che sono completamente fuori dallo schermo in basso
+    global collectibles
+    # Rimuovi collectibles che sono completamente fuori dallo schermo in basso rispetto al world_offset
+    # Pruning centralizzato in collectibles.py
+    from collectibles import prune_orphaned_or_offscreen
+    prune_orphaned_or_offscreen(collectibles, platform_manager, world_offset, SCREEN_HEIGHT)
     for c in collectibles:
         c.draw(screen, world_offset)
 
@@ -141,39 +157,37 @@ def update_fountain():
     
     if not victory_fountain_active:
         return
-    
-    # Genera nuove particelle
+
+    # Genera nuove particelle (getto largo e fumo largo)
     fountain_x = SCREEN_WIDTH // 2
     fountain_y = SCREEN_HEIGHT // 2  # Al centro dello schermo
-    
-    for _ in range(10):
+
+    for _ in range(6):
         fountain_particles.append(LavaParticle(fountain_x, fountain_y))
     for _ in range(8):
         fountain_particles.append(SmokeParticle(fountain_x, fountain_y))
-    
+
     # Aggiorna particelle esistenti
     for particle in fountain_particles:
         particle.update()
-    
+
     # Rimuovi particelle vecchie
     fountain_particles = [p for p in fountain_particles 
-                         if hasattr(p, 'age') and p.age < p.max_age or
-                         hasattr(p, 'y') and p.y < SCREEN_HEIGHT + 50]
+                         if (hasattr(p, 'age') and p.age < p.max_age) or (hasattr(p, 'y') and p.y < SCREEN_HEIGHT + 50)]
 
 def draw_fountain(screen):
     """Disegna l'effetto fontana."""
     if not victory_fountain_active:
         return
-    
-    # Disegna prima il fumo, poi la lava
+
+    # Disegna prima il fumo, poi la lava (come nel nuovo sistema)
     smoke_particles = [p for p in fountain_particles if hasattr(p, 'age')]
     lava_particles = [p for p in fountain_particles if not hasattr(p, 'age')]
-    
-    for particle in smoke_particles:
-        particle.draw(screen)
-    
-    for particle in lava_particles:
-        particle.draw(screen)
+
+    for p in smoke_particles:
+        p.draw(screen)
+    for p in lava_particles:
+        p.draw(screen)
 
 def draw_cooling_bar(screen, current_time, max_time):
     """Disegna la barra di raffreddamento in alto a destra."""
@@ -301,16 +315,27 @@ def update_game(dt):
             background_manager.update(dy, total_scroll_distance)
             total_scroll_distance += dy
 
-            # Quando vengono aggiunte nuove piattaforme, aggiungi bolle di magma
-            for plat in platform_manager.platforms[-3:]:
-                if not any(abs(c.x - plat.rect.centerx) < 5 and abs(c.y - (plat.rect.top - 12)) < 5 for c in collectibles if c.type == 'magma_bubble'):
-                    add_magma_bubble_for_platform(plat)
+            # Quando vengono aggiunte nuove piattaforme, aggiungi bolle di magma solo se non bloccato
+            global block_on_demand_collectibles
+            if not block_on_demand_collectibles:
+                for plat in platform_manager.platforms[-3:]:
+                    if not any(abs(c.x - plat.rect.centerx) < 5 and abs(c.y - (plat.rect.top - 12)) < 5 for c in collectibles if c.type == 'magma_bubble'):
+                        add_magma_bubble_for_platform(plat)
 
         # Aggiorna livello in base alla posizione
+        old_level = level_manager.get_current_level()['name']
         level_manager.update(total_scroll_distance)
+        new_level = level_manager.get_current_level()['name']
+        if new_level != old_level:
+            # Cambio livello: NON rigenerare piattaforme, mantieni quelle esistenti
+            # Puoi eventualmente aggiungere collectibles sulle nuove piattaforme se necessario
+            spawn_magma_bubbles_on_platforms()
+            block_on_demand_collectibles = True
+        else:
+            block_on_demand_collectibles = False
 
         # Aggiorna nemici (con offset per effetto salita)
-        enemy_manager.update(dt, dy)
+        enemy_manager.update(dt, dy, total_scroll_distance)
 
         # Collisione nemici
         hits = enemy_manager.check_collision(player)
@@ -470,6 +495,34 @@ while running:
         if player is not None:
             draw_game(screen)  # Mostra il gioco in background
         ui_system.draw_name_input(screen, final_score)
+
+    # Gestione salvataggio punteggio con nomi duplicati
+    if game_state == ENTER_NAME and ui_system.input_text.strip():
+        from save_system import add_score, force_add_score, add_score_with_number
+        name = ui_system.input_text.strip()
+        result, scores = add_score(name, final_score)
+        if result == 'duplicate':
+            # Chiedi all'utente se vuole sovrascrivere o rinominare
+            import pygame
+            font = pygame.font.SysFont(None, 32)
+            msg = f"Il nome '{name}' esiste già. Sovrascrivere? (S/N)"
+            text_surf = font.render(msg, True, (255,255,0))
+            screen.blit(text_surf, (50, 200))
+            pygame.display.flip()
+            waiting = True
+            while waiting:
+                for event in pygame.event.get():
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_s:
+                            force_add_score(name, final_score)
+                            ui_system.reset_input()
+                            game_state = SCORE_LIST
+                            waiting = False
+                        elif event.key == pygame.K_n:
+                            add_score_with_number(name, final_score)
+                            ui_system.reset_input()
+                            game_state = SCORE_LIST
+                            waiting = False
     
     pygame.display.flip()
 

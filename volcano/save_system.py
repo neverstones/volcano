@@ -36,19 +36,51 @@ def save_high_scores(scores):
 def add_score(name, score):
     """Aggiunge un nuovo punteggio alla classifica."""
     scores = load_high_scores()
-    
+    # Cerca se esiste già un nome uguale
+    existing = [s for s in scores if s['name'] == name]
+    if existing:
+        return 'duplicate', scores
     new_score = {
         'name': name,
         'score': score,
         'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
-    
     scores.append(new_score)
-    
-    # Ordina per punteggio decrescente e mantieni solo i primi 10
     scores.sort(key=lambda x: x['score'], reverse=True)
     scores = scores[:10]
-    
+    save_high_scores(scores)
+    return 'added', scores
+
+def force_add_score(name, score):
+    scores = load_high_scores()
+    # Rimuovi tutti i punteggi con lo stesso nome
+    scores = [s for s in scores if s['name'] != name]
+    new_score = {
+        'name': name,
+        'score': score,
+        'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    scores.append(new_score)
+    scores.sort(key=lambda x: x['score'], reverse=True)
+    scores = scores[:10]
+    save_high_scores(scores)
+    return scores
+
+def add_score_with_number(name, score):
+    scores = load_high_scores()
+    base = name
+    i = 2
+    while any(s['name'] == name for s in scores):
+        name = f"{base}{i}"
+        i += 1
+    new_score = {
+        'name': name,
+        'score': score,
+        'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    scores.append(new_score)
+    scores.sort(key=lambda x: x['score'], reverse=True)
+    scores = scores[:10]
     save_high_scores(scores)
     return scores
 

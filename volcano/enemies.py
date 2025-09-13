@@ -211,23 +211,27 @@ class EnemyManager:
         weights = list(self.spawn_weights.values())
         return random.choices(minerals, weights=weights)[0]
 
-    def update(self, dt, scroll_offset=0):
+    def update(self, dt, scroll_offset=0, total_scroll_distance=0):
         self.spawn_timer += dt
-        
-        # Spawn nemico singolo a intervalli variabili
-        if self.spawn_timer >= self.next_spawn_time:
-            self.spawn_single_enemy()
+
+        # Difficoltà: più si sale, più spawn veloci (min 0.7s tra spawn)
+        difficulty = min(1.5, 0.2 + (total_scroll_distance or 0) / 3000)
+        effective_spawn_interval = max(0.7, self.base_spawn_interval / difficulty)
+
+        if self.spawn_timer >= effective_spawn_interval:
+            # Più si sale, più nemici spawnano insieme (max 3)
+            n = 1 + int((total_scroll_distance or 0) / 4000)
+            for _ in range(min(n, 3)):
+                self.spawn_single_enemy()
             self.spawn_timer = 0
             self.next_spawn_time = self._calculate_next_spawn()
 
         # Aggiorna tutti i nemici
         for enemy in list(self.enemies):
             enemy.update()
-            
             # Applica offset di scroll per effetto salita del player
             if scroll_offset > 0:
                 enemy.rect.y += scroll_offset
-            
             # Rimuovi nemici fuori schermo
             if enemy.rect.top > SCREEN_HEIGHT + 50:
                 self.enemies.remove(enemy)

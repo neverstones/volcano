@@ -1,3 +1,17 @@
+@staticmethod
+def prune_orphaned_or_offscreen(collectibles, platform_manager, world_offset, screen_height):
+    """Rimuove collectibles se la piattaforma associata non è più attiva o sono fuori schermo."""
+    active_platforms = set(platform_manager.platforms)
+    def is_collectible_visible(c):
+        if c.platform is not None:
+            if c.platform not in active_platforms:
+                return False
+            plat_y = c.platform.rect.top + world_offset
+            return -50 < plat_y < screen_height + 50
+        else:
+            y = c.y + world_offset
+            return -50 < y < screen_height + 50
+    collectibles[:] = [c for c in collectibles if is_collectible_visible(c)]
 import pygame
 import random
 import math
@@ -71,67 +85,74 @@ class Collectible:
             plat_x = self.platform.rect.centerx
             plat_y = self.platform.rect.top
 
-        if self.float_text:
-            font = pygame.font.SysFont(None, 32)
-            alpha = max(0, 255 - int(self.float_timer * 255))
-            text_surf = font.render(self.float_text, True, (255,255,0))
-            text_surf.set_alpha(alpha)
-            surface.blit(text_surf, (plat_x-18, plat_y + world_offset + self.float_y))
-            return
+            # Offset verticale per le magma_bubble (sempre sopra la piattaforma)
+            vertical_gap = 10  # spazio visivo tra piattaforma e bolla
 
-        if self.collected:
-            return
-
-        # Statico: la bolla resta ferma sulla piattaforma
-        screen_y = plat_y + world_offset
-        if -50 < screen_y < SCREEN_HEIGHT + 50:
-            if self.type == 'magma_bubble':
-                y_draw = screen_y
-                # Particelle lava decorative ancorate alla piattaforma
-                for p in self.lava_particles:
-                    alpha = int(255 * (1 - p['age']/p['life']))
-                    color = (255, 120, 0, alpha)
-                    s = pygame.Surface((p['radius']*2, p['radius']*2), pygame.SRCALPHA)
-                    pygame.draw.circle(s, color, (p['radius'], p['radius']), p['radius'])
-                    # Le particelle sono sempre relative alla piattaforma
-                    surface.blit(s, (plat_x + p['rel_x'] - p['radius'], plat_y + p['rel_y'] - p['radius'] + world_offset))
-                # Bolla
-                pygame.draw.circle(surface, (255, 120, 0), (int(plat_x), int(y_draw)), self.radius)
-                glow_surf = pygame.Surface((self.radius*2+8, self.radius*2+8), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (255, 200, 80, 80), (self.radius+4, self.radius+4), self.radius+4)
-                surface.blit(glow_surf, (int(plat_x)-self.radius-4, int(y_draw)-self.radius-4), special_flags=pygame.BLEND_RGBA_ADD)
-                pygame.draw.circle(surface, (255, 255, 180), (int(plat_x)-4, int(y_draw)-4), 5)
-                pygame.draw.circle(surface, (180, 60, 0), (int(plat_x), int(y_draw)), self.radius, 2)
+            if self.type == 'magma_bubble' and self.platform is not None:
+                y_draw = plat_y - vertical_gap - self.radius + world_offset
             else:
-                # ...existing code for other types...
-                rotation = self.animation_time
-                scale = 0.9 + 0.1 * math.sin(self.animation_time * 2)
-                color = self.colors[self.type]
-                radius = int(self.radius * scale)
-                points = []
-                for i in range(8):
-                    angle = rotation + i * math.pi / 4
-                    if i % 2 == 0:
-                        r = radius
-                    else:
-                        r = radius * 0.5
-                    x = self.x + r * math.cos(angle)
-                    y = screen_y + r * math.sin(angle)
-                    points.append((x, y))
-                pygame.draw.polygon(surface, color, points)
-                pygame.draw.polygon(surface, (255, 255, 255), points, 2)
-                # Particelle scintillanti - VERSIONE STABILE
-                time_seed = int(pygame.time.get_ticks() / 200) % 1000  # Cambia ogni 200ms
-                crystal_seed = int(self.x + self.y) % 100  # Seed basato su posizione
-                for i in range(3):
-                    particle_seed = (time_seed + crystal_seed + i * 17) % 1000
-                    px = self.x + ((particle_seed % 31) - 15)  # -15 a +15
-                    py = screen_y + (((particle_seed + 31) % 31) - 15)  # -15 a +15
-                    size = 1 + (particle_seed % 3)  # 1-3
-                    alpha = int(255 * ((particle_seed % 100) / 100.0))  # 0-255
-                    sparkle_surface = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
-                    pygame.draw.circle(sparkle_surface, (*color, alpha), (size, size), size)
-                    surface.blit(sparkle_surface, (px-size, py-size))
+                y_draw = plat_y + world_offset
+
+            # Testo che sale e si dissolve
+            if self.float_text:
+                font = pygame.font.SysFont(None, 32)
+                alpha = max(0, 255 - int(self.float_timer * 255))
+                text_surf = font.render(self.float_text, True, (255,255,0))
+                text_surf.set_alpha(alpha)
+                surface.blit(text_surf, (plat_x-18, y_draw + self.float_y))
+
+            if self.collected:
+                return
+
+            # Statico: la bolla resta ferma sulla piattaforma
+            screen_y = y_draw
+            if -50 < screen_y < SCREEN_HEIGHT + 50:
+                if self.type == 'magma_bubble':
+                    # Particelle lava decorative ancorate alla piattaforma
+                    for p in self.lava_particles:
+                        alpha = int(255 * (1 - p['age']/p['life']))
+                        color = (255, 120, 0, alpha)
+                        s = pygame.Surface((p['radius']*2, p['radius']*2), pygame.SRCALPHA)
+                        pygame.draw.circle(s, color, (p['radius'], p['radius']), p['radius'])
+                        # Le particelle sono sempre relative alla piattaforma
+                        surface.blit(s, (plat_x + p['rel_x'] - p['radius'], plat_y + p['rel_y'] - p['radius'] - vertical_gap - self.radius + world_offset))
+                    # Bolla
+                    pygame.draw.circle(surface, (255, 120, 0), (int(plat_x), int(y_draw)), self.radius)
+                    glow_surf = pygame.Surface((self.radius*2+8, self.radius*2+8), pygame.SRCALPHA)
+                    pygame.draw.circle(glow_surf, (255, 200, 80, 80), (self.radius+4, self.radius+4), self.radius+4)
+                    surface.blit(glow_surf, (int(plat_x)-self.radius-4, int(y_draw)-self.radius-4), special_flags=pygame.BLEND_RGBA_ADD)
+                    pygame.draw.circle(surface, (255, 255, 180), (int(plat_x)-4, int(y_draw)-4), 5)
+                    pygame.draw.circle(surface, (180, 60, 0), (int(plat_x), int(y_draw)), self.radius, 2)
+                else:
+                    # ...existing code for other types...
+                    color = self.colors.get(self.type, (255,255,255))
+                    rotation = self.animation_time
+                    scale = 0.9 + 0.1 * math.sin(self.animation_time * 2)
+                    radius = int(self.radius * scale)
+                    points = []
+                    for i in range(8):
+                        angle = rotation + i * math.pi / 4
+                        if i % 2 == 0:
+                            r = radius
+                        else:
+                            r = radius * 0.5
+                        x = self.x + r * math.cos(angle)
+                        y = screen_y + r * math.sin(angle)
+                        points.append((x, y))
+                    pygame.draw.polygon(surface, color, points)
+                    pygame.draw.polygon(surface, (255, 255, 255), points, 2)
+                    # Particelle scintillanti - VERSIONE STABILE
+                    time_seed = int(pygame.time.get_ticks() / 200) % 1000  # Cambia ogni 200ms
+                    crystal_seed = int(self.x + self.y) % 100  # Seed basato su posizione
+                    for i in range(3):
+                        particle_seed = (time_seed + crystal_seed + i * 17) % 1000
+                        px = self.x + ((particle_seed % 31) - 15)  # -15 a +15
+                        py = screen_y + (((particle_seed + 31) % 31) - 15)  # -15 a +15
+                        size = 1 + (particle_seed % 3)  # 1-3
+                        alpha = int(255 * ((particle_seed % 100) / 100.0))  # 0-255
+                        sparkle_surface = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
+                        pygame.draw.circle(sparkle_surface, (*color, alpha), (size, size), size)
+                        surface.blit(sparkle_surface, (px-size, py-size))
 
     def check_collision(self, player):
         if self.collected or self.float_text:

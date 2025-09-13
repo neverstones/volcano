@@ -1,4 +1,4 @@
-﻿import pygame
+import pygame
 import random
 import math
 
@@ -75,73 +75,50 @@ class SmokeParticle:
         pygame.draw.circle(s, (40,40,40,alpha), (size,size), size)
         surf.blit(s, (self.x-size, self.y-size))
 
-    def update(self):
-        gravity = 0.05  # Gravità molto ridotta per il fumo
-        self.vy += gravity
-        
-        self.x += self.vx + math.sin(self.age*0.03)*0.5
-        self.y += self.vy
-        self.age += 1
+# --- Setup Pygame ---
+pygame.init()
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Fontana Lava + Plume Fumo")
+clock = pygame.time.Clock()
 
-        self.radius *= 1.003
+fountain_x = SCREEN_WIDTH//2
+fountain_y = SCREEN_HEIGHT-50
+lava_particles = []
+smoke_particles = []
 
-    def draw(self, surf):
-        alpha = max(0, int(200 * (1 - self.age/self.max_age)))
-        if alpha <= 0:
-            return
-        size = int(self.radius)
-        s = pygame.Surface((size*2,size*2), pygame.SRCALPHA)
-        pygame.draw.circle(s, (40,40,40,alpha), (size,size), size)
-        surf.blit(s, (self.x-size, self.y-size))
+running = True
+while running:
+    dt = clock.tick(FPS)/1000.0
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
 
-if __name__ == "__main__":
-    pygame.init()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Fontana Ultra-Spettacolare")
-    clock = pygame.time.Clock()
+    # --- Genera particelle ---
+    for _ in range(6):
+        lava_particles.append(LavaParticle(fountain_x, fountain_y))
+    for _ in range(8):
+        smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
 
-    fountain_x = SCREEN_WIDTH//2
-    fountain_y = SCREEN_HEIGHT-50
-    lava_particles = []
-    smoke_particles = []
+    # --- Aggiorna ---
+    for p in lava_particles:
+        p.update()
+    for p in smoke_particles:
+        p.update()
 
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+    # --- Pulisci vecchie particelle ---
+    lava_particles = [p for p in lava_particles if p.y < SCREEN_HEIGHT+50]
+    smoke_particles = [p for p in smoke_particles if p.age < p.max_age]
 
-        # Fontana: getto centrale e due archi laterali
-        for _ in range(3):
-            lava_particles.append(LavaParticle(fountain_x, fountain_y, mode="center"))
-        for _ in range(3):
-            lava_particles.append(LavaParticle(fountain_x, fountain_y, mode="left"))
-        for _ in range(3):
-            lava_particles.append(LavaParticle(fountain_x, fountain_y, mode="right"))
-        for _ in range(5):
-            smoke_particles.append(SmokeParticle(fountain_x, fountain_y))
+    # --- Disegno ---
+    screen.fill((10,10,20))
 
-        # Aggiorna
-        for p in lava_particles:
-            p.update()
-        for p in smoke_particles:
-            p.update()
+    # prima fumo
+    for p in smoke_particles:
+        p.draw(screen)
+    # poi lava in primo piano
+    for p in lava_particles:
+        p.draw(screen)
 
-        # Pulisci
-        lava_particles = [p for p in lava_particles if p.y < SCREEN_HEIGHT+100]
-        smoke_particles = [p for p in smoke_particles if p.age < p.max_age]
+    pygame.display.flip()
 
-        # Disegna
-        screen.fill((10,10,20))
-
-        # Prima fumo
-        for p in smoke_particles:
-            p.draw(screen)
-        # Poi lava
-        for p in lava_particles:
-            p.draw(screen)
-
-        pygame.display.flip()
-        clock.tick(FPS)
-
-    pygame.quit()
+pygame.quit()
