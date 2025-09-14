@@ -7,6 +7,50 @@ from constants import SCREEN_WIDTH, SCREEN_HEIGHT, MENU, PLAYING, SCORE_LIST, EN
 from save_system import get_top_scores, add_score
 
 class UISystem:
+    @staticmethod
+    def draw_cooling_bar(screen, current_time, max_time):
+        """Disegna la barra di raffreddamento in alto a destra."""
+        bar_width = 200
+        bar_height = 20
+        bar_x = SCREEN_WIDTH - bar_width - 20
+        bar_y = 20
+        percentage = max(0, current_time / max_time)
+        fill_width = int(bar_width * percentage)
+        if percentage > 0.6:
+            bar_color = (0, 255, 0)
+        elif percentage > 0.3:
+            bar_color = (255, 255, 0)
+        else:
+            bar_color = (255, 0, 0)
+        border_rect = pygame.Rect(bar_x - 2, bar_y - 2, bar_width + 4, bar_height + 4)
+        pygame.draw.rect(screen, (255, 255, 255), border_rect, 2)
+        background_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+        pygame.draw.rect(screen, (40, 40, 40), background_rect)
+        if fill_width > 0:
+            fill_rect = pygame.Rect(bar_x, bar_y, fill_width, bar_height)
+            pygame.draw.rect(screen, bar_color, fill_rect)
+            for i in range(bar_height):
+                alpha = 255 - int((i / bar_height) * 100)
+                gradient_color = (*bar_color, alpha)
+                if i < fill_width:
+                    gradient_surface = pygame.Surface((fill_width, 1), pygame.SRCALPHA)
+                    gradient_surface.fill(gradient_color)
+                    screen.blit(gradient_surface, (bar_x, bar_y + i))
+        font = pygame.font.SysFont(None, 24)
+        label_text = font.render("Raffreddamento", True, (255, 255, 255))
+        label_rect = label_text.get_rect()
+        label_rect.centerx = bar_x + bar_width // 2
+        label_rect.bottom = bar_y - 5
+        screen.blit(label_text, label_rect)
+        timer_font = pygame.font.SysFont(None, 20)
+        time_remaining = max(0, int(current_time))
+        minutes = time_remaining // 60
+        seconds = time_remaining % 60
+        timer_text = timer_font.render(f"{minutes:02d}:{seconds:02d}", True, (255, 180, 0))
+        timer_rect = timer_text.get_rect()
+        timer_rect.centerx = bar_x + bar_width // 2
+        timer_rect.top = bar_y + bar_height + 5
+        screen.blit(timer_text, timer_rect)
     def __init__(self):
         self.font_big = pygame.font.Font(None, 64)
         self.font_medium = pygame.font.Font(None, 48)

@@ -1,3 +1,90 @@
+import random
+import pygame
+from constants import SCREEN_HEIGHT
+
+# --- Gestione bolle di magma e collectibles globali ---
+collectibles = []
+block_on_demand_collectibles = False
+
+def spawn_magma_bubbles_on_platforms(platform_manager):
+    """Posiziona una bolla di magma su ogni piattaforma di ogni livello, senza offset y."""
+    global collectibles
+    collectibles = []
+    for plat in platform_manager.platforms:
+        # Maggiore probabilità nelle zone di transizione tra livelli
+        y = plat.rect.top
+        # Ottieni info livello se disponibile
+        level_manager = getattr(platform_manager, 'level_manager', None)
+        current_level = None
+        next_level_y = None
+        prev_level_y = None
+        if level_manager:
+            current_level = level_manager.get_current_level()
+            # Trova i confini dei livelli
+            levels = level_manager.levels
+            idx = [i for i, l in enumerate(levels) if l['name'] == current_level['name']]
+            if idx:
+                i = idx[0]
+                if i > 0:
+                    prev_level_y = levels[i-1]['start']
+                if i < len(levels)-1:
+                    next_level_y = levels[i+1]['start']
+        # Default: probabilità normale
+        prob = 0.8
+        # Se la piattaforma è vicina a un confine di livello, aumenta la probabilità
+        if prev_level_y is not None and abs(y - prev_level_y) < 180:
+            prob = 1.0
+        if next_level_y is not None and abs(y - next_level_y) < 180:
+            prob = 1.0
+        if random.random() < prob:
+            if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
+                x = plat.rect.centerx
+                radius = 10  # Deve corrispondere a Collectible.radius
+                offset = 16  # Spazio extra tra piattaforma e bolla
+                y_bubble = plat.rect.top - offset - radius
+                bubble = Collectible(x, y_bubble, value=200)
+                bubble.type = 'magma_bubble'
+                bubble.platform = plat  # Associa la piattaforma
+                collectibles.append(bubble)
+
+def add_magma_bubble_for_platform(plat):
+    """Aggiunge una bolla di magma su ogni nuova piattaforma, senza offset y."""
+    global collectibles
+    if random.random() < 0.8:
+        if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
+            x = plat.rect.centerx
+            radius = 10  # Deve corrispondere a Collectible.radius
+            offset = 16  # Spazio extra tra piattaforma e bolla
+            y = plat.rect.top - offset - radius
+            bubble = Collectible(x, y, value=200)
+            bubble.type = 'magma_bubble'
+            bubble.platform = plat  # Associa la piattaforma
+            collectibles.append(bubble)
+
+def update_collectibles(dt):
+    global collectibles
+    for c in collectibles:
+        c.update(dt)
+
+def draw_collectibles(screen, world_offset, platform_manager):
+    global collectibles
+    from collectibles import prune_orphaned_or_offscreen
+    prune_orphaned_or_offscreen(collectibles, platform_manager, world_offset, SCREEN_HEIGHT)
+    for c in collectibles:
+        c.draw(screen, world_offset)
+
+def check_collectibles_collision(player):
+    global collectibles
+    collected = 0
+    for c in collectibles:
+        if not c.collected and c.type == 'magma_bubble' and c.check_collision(player):
+            c.collected = True
+            c.trigger_float_text(f'+{c.value}')
+            collected += c.value
+    return collected
+
+def get_world_offset():
+    return 0
 @staticmethod
 def prune_orphaned_or_offscreen(collectibles, platform_manager, world_offset, screen_height):
     """Rimuove collectibles se la piattaforma associata non è più attiva o sono fuori schermo."""

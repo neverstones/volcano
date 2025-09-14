@@ -1,4 +1,50 @@
-﻿import pygame
+﻿# --- Gestione stato vittoria e fontana ---
+import time
+
+victory_fountain_active = False
+fountain_start_time = 0
+victory_timer = 0
+fountain = None
+
+def reset_victory_state():
+    global victory_fountain_active, fountain_start_time, victory_timer, fountain
+    victory_fountain_active = False
+    fountain_start_time = 0
+    victory_timer = 0
+    fountain = None
+
+def start_victory_fountain(screen_width, screen_height):
+    global victory_fountain_active, fountain_start_time, fountain
+    victory_fountain_active = True
+    fountain_start_time = time.time()
+    from fountain import Fountain
+    fountain = Fountain(screen_width // 2, screen_height // 2)
+    return fountain
+
+def update_victory_fountain():
+    global victory_timer, fountain_start_time, fountain
+    victory_timer = time.time() - fountain_start_time
+    if fountain is not None:
+        fountain.emit()
+        fountain.update()
+    return victory_timer
+
+def is_victory_active():
+    global victory_fountain_active
+    return victory_fountain_active
+
+def get_victory_timer():
+    global victory_timer
+    return victory_timer
+
+def get_fountain():
+    global fountain
+    return fountain
+
+def set_victory_active(val):
+    global victory_fountain_active
+    victory_fountain_active = val
+import pygame
 import random
 import math
 

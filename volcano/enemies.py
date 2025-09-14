@@ -211,8 +211,21 @@ class EnemyManager:
         weights = list(self.spawn_weights.values())
         return random.choices(minerals, weights=weights)[0]
 
-    def update(self, dt, scroll_offset=0, total_scroll_distance=0):
+    def update(self, dt, scroll_offset=0, total_scroll_distance=0, current_level_name=None):
         self.spawn_timer += dt
+
+        # Blocca o riduci drasticamente la generazione di nemici nel vulcano
+        if current_level_name == "Vulcano":
+            max_enemies = 2
+            if len(self.enemies) > max_enemies:
+                # Solo aggiorna e rimuovi, non spawnare
+                for enemy in list(self.enemies):
+                    enemy.update()
+                    if scroll_offset > 0:
+                        enemy.rect.y += scroll_offset
+                    if enemy.rect.top > SCREEN_HEIGHT + 50:
+                        self.enemies.remove(enemy)
+                return
 
         # Difficoltà: più si sale, più spawn veloci (min 0.7s tra spawn)
         difficulty = min(1.5, 0.2 + (total_scroll_distance or 0) / 3000)
@@ -222,7 +235,12 @@ class EnemyManager:
             # Più si sale, più nemici spawnano insieme (max 3)
             n = 1 + int((total_scroll_distance or 0) / 4000)
             for _ in range(min(n, 3)):
-                self.spawn_single_enemy()
+                # Nel vulcano, spawn solo se sotto il limite
+                if current_level_name == "Vulcano":
+                    if len(self.enemies) < max_enemies:
+                        self.spawn_single_enemy()
+                else:
+                    self.spawn_single_enemy()
             self.spawn_timer = 0
             self.next_spawn_time = self._calculate_next_spawn()
 
