@@ -28,7 +28,7 @@ ACTION_AREA_RIGHT = SCREEN_WIDTH - 50
 LEVEL_HEIGHT = 2000
 
 # Dimensioni piattaforme
-PLATFORM_WIDTH = 80
+PLATFORM_WIDTH = 55  # Più strette per aumentare la difficoltà
 PLATFORM_HEIGHT = 15
 PLAYER_RADIUS = 32
 

@@ -38,8 +38,8 @@ def spawn_magma_bubbles_on_platforms():
     global collectibles
     collectibles = []
     for plat in platform_manager.platforms:
-        # Solo su alcune piattaforme (es. 40% di probabilità)
-        if random.random() < 0.4:
+        # Solo su alcune piattaforme (es. 80% di probabilità)
+        if random.random() < 0.8:
             if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
                 x = plat.rect.centerx
                 # Posiziona la bolla completamente sopra la piattaforma lasciando uno spazio
@@ -53,8 +53,8 @@ def spawn_magma_bubbles_on_platforms():
 
 def add_magma_bubble_for_platform(plat):
     """Aggiunge una bolla di magma su ogni nuova piattaforma, senza offset y."""
-    # Solo su alcune piattaforme (es. 40% di probabilità)
-    if random.random() < 0.4:
+    # Solo su alcune piattaforme (es. 80% di probabilità)
+    if random.random() < 0.8:
         if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
             x = plat.rect.centerx
             radius = 10  # Deve corrispondere a Collectible.radius

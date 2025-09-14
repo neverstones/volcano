@@ -2,3 +2,11 @@ volcano_debug_20250901_085415.log
 volcano_game_20250905_124211.log
 volcano_game_20250905_124337.log
 volcano_game_20250905_124531.log
+volcano/constants.py
+volcano/constants.py
+volcano/enemies.py
+volcano/main.py
+volcano/platforms.py
+volcano/__pycache__/constants.cpython-312.pyc
+volcano/__pycache__/enemies.cpython-312.pyc
+volcano/__pycache__/platforms.cpython-312.pyc

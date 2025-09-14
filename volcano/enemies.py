@@ -5,12 +5,12 @@ from constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 # penalità secondi per tipo minerale
 penalties = {
-    "olivina": 5,
-    "pirosseno": 8, 
-    "anfibolo": 10,
-    "biotite": 12,
-    "feldspato": 7,
-    "quarzo": 15,
+    "olivina": 10,
+    "pirosseno": 16, 
+    "anfibolo": 20,
+    "biotite": 24,
+    "feldspato": 14,
+    "quarzo": 30,
 }
 
 # Proprietà grafiche per ogni minerale
@@ -186,8 +186,8 @@ class EnemyManager:
     def __init__(self):
         self.enemies = pygame.sprite.Group()
         self.spawn_timer = 0
-        self.base_spawn_interval = 3.0  # secondi base tra spawn
-        self.spawn_variation = 2.0  # variazione casuale
+        self.base_spawn_interval = 1.5  # secondi base tra spawn (dimezzato)
+        self.spawn_variation = 1.0  # variazione casuale (dimezzato)
         self.next_spawn_time = self._calculate_next_spawn()
         
         # Probabilità di spawn per tipo (alcuni più rari)

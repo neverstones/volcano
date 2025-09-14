@@ -32,11 +32,11 @@ class Platform(pygame.sprite.Sprite):
 class PlatformManager:
     def __init__(self,num_platforms=10):
         self.platforms = []
-        self.num_platforms = num_platforms
-        # Gap ridotti per compensare il salto più basso
-        self.min_gap = 40  # Ridotto da 45
-        self.max_gap = 75  # Ridotto da 85
-        
+        # Riduci il numero massimo di piattaforme per aumentare la difficoltà
+        self.num_platforms = 10
+        # Gap ridotti per aumentare la difficoltà
+        self.min_gap = 25  # Distanza minima più bassa (più difficile)
+        self.max_gap = 55  # Distanza massima più bassa (più difficile)
         # Riferimento al background manager per ottenere i limiti del vulcano
         self.background_manager = None
         
