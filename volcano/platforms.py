@@ -94,7 +94,8 @@ class PlatformManager:
             return Platform(x, y, w=PLATFORM_WIDTH, moving=random.random()<0.2)
 
     def generate_initial_platforms(self, player, level_manager=None, depth_multiplier=6):
-        self.platforms=[]
+        # Svuota sempre la lista piattaforme
+        self.platforms = []
         current_level = level_manager.get_current_level()["name"] if level_manager else "Mantello"
         # Recupera il limite del cratere dal background manager se disponibile
         crater_height = None
@@ -102,13 +103,11 @@ class PlatformManager:
             total_height = self.background_manager.tiles_per_level * SCREEN_HEIGHT
             crater_height = total_height * 0.9
         # Crea sempre una piattaforma di partenza sotto il giocatore
-        start_platform_x = player.x - PLATFORM_WIDTH // 2
-        # Adatta i limiti in base al livello
+        start_platform_y = player.y + player.radius + 20
         if current_level == "Vulcano":
-            # Genera piattaforme strette, tra le pareti, alcune crollanti, solo fino al cratere
             volcano_min_gap = 30
             volcano_max_gap = 55
-            left_bound, right_bound = self.get_volcano_platform_bounds(player.y + player.radius + 20)
+            left_bound, right_bound = self.get_volcano_platform_bounds(start_platform_y)
             if left_bound is None or right_bound is None:
                 start_platform_x = max(50, min(player.x - 20, SCREEN_WIDTH - 40 - 50))
                 platform_width = 40
@@ -120,7 +119,6 @@ class PlatformManager:
                     platform_width = 40
                 else:
                     start_platform_x = max(left_bound, min(player.x - platform_width // 2, right_bound - platform_width))
-            start_platform_y = player.y + player.radius + 20
             start_platform = Platform(start_platform_x, start_platform_y, w=platform_width, moving=random.random()<0.1)
             start_platform.crumbling = random.random() < 0.18
             self.platforms.append(start_platform)
@@ -149,7 +147,6 @@ class PlatformManager:
         else:
             start_platform_x = max(50, min(player.x - PLATFORM_WIDTH // 2, SCREEN_WIDTH - PLATFORM_WIDTH - 50))
             current_level_for_platform = current_level
-            start_platform_y = player.y + player.radius + 20
             start_platform = self.generate_volcano_platform(start_platform_x, start_platform_y, current_level_for_platform)
             self.platforms.append(start_platform)
             current_y = start_platform_y
