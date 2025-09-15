@@ -5,7 +5,7 @@ import pygame
 
 
 #Game time
-GAME_TIME = 120
+GAME_TIME = 120 + 60
 
 # Screen dimensions
 SCREEN_WIDTH = 700

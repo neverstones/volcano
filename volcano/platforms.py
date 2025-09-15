@@ -9,6 +9,8 @@ class Platform(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x,y))
         self.moving = moving
         self.speed = random.choice([-2,2]) if moving else 0
+        self.crumbling = False
+        self.crumble_timer = None  # None finché non inizia a crollare
 
     def update(self, volcano_bounds=None):
         if self.moving:
@@ -25,8 +27,17 @@ class Platform(pygame.sprite.Sprite):
             else:
                 if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
                     self.speed *= -1
+        # Gestione timer crollo
+        if self.crumbling and self.crumble_timer is not None:
+            self.crumble_timer -= 1
 
     def draw(self, screen):
+        # Se crollante, cambia colore
+        if self.crumbling:
+            color = (200, 100, 100) if self.crumble_timer is None else (255, 50, 50)
+            self.image.fill(color)
+        else:
+            self.image.fill((100,200,100))
         screen.blit(self.image, self.rect.topleft)
 
 class PlatformManager:
@@ -94,46 +105,47 @@ class PlatformManager:
         start_platform_x = player.x - PLATFORM_WIDTH // 2
         # Adatta i limiti in base al livello
         if current_level == "Vulcano":
-            # Poche piattaforme, gap ridotto, strette e sempre vicine al player
-            max_platforms = 6
+            # Genera piattaforme strette, tra le pareti, alcune crollanti, solo fino al cratere
             volcano_min_gap = 30
             volcano_max_gap = 55
             left_bound, right_bound = self.get_volcano_platform_bounds(player.y + player.radius + 20)
             if left_bound is None or right_bound is None:
-                start_platform_x = max(50, min(player.x - PLATFORM_WIDTH // 2, SCREEN_WIDTH - PLATFORM_WIDTH - 50))
-                current_level_for_platform = "Crosta"
+                start_platform_x = max(50, min(player.x - 20, SCREEN_WIDTH - 40 - 50))
+                platform_width = 40
             else:
                 passage_width = right_bound - left_bound
-                platform_width = min(40, passage_width - 10)  # ancora più strette
+                platform_width = min(40, passage_width - 10)
                 if passage_width < 40 or platform_width < 25:
-                    return
-                start_platform_x = max(left_bound, min(player.x - platform_width // 2, right_bound - platform_width))
-                current_level_for_platform = current_level
+                    start_platform_x = int((left_bound + right_bound) // 2 - 20)
+                    platform_width = 40
+                else:
+                    start_platform_x = max(left_bound, min(player.x - platform_width // 2, right_bound - platform_width))
             start_platform_y = player.y + player.radius + 20
-            start_platform = self.generate_volcano_platform(start_platform_x, start_platform_y, current_level_for_platform)
+            start_platform = Platform(start_platform_x, start_platform_y, w=platform_width, moving=random.random()<0.1)
+            start_platform.crumbling = random.random() < 0.18
             self.platforms.append(start_platform)
             current_y = start_platform_y
-            platforms_count = 1
-            while current_y > -SCREEN_HEIGHT * 2 and platforms_count < max_platforms:
+            max_depth = -SCREEN_HEIGHT * 8
+            while current_y > max_depth:
                 gap = random.randint(volcano_min_gap, volcano_max_gap)
                 y = current_y - gap
                 left_bound, right_bound = self.get_volcano_platform_bounds(y)
+                # Blocca la generazione oltre il cratere
                 if left_bound is None or right_bound is None:
-                    x = random.randint(50, SCREEN_WIDTH - PLATFORM_WIDTH - 50)
-                    platform = self.generate_volcano_platform(x, y, "Crosta")
+                    break
+                passage_width = right_bound - left_bound
+                platform_width = min(40, passage_width - 10)
+                if passage_width < 40 or platform_width < 25:
+                    x = int((left_bound + right_bound) // 2 - 20)
+                    platform_width = 40
+                elif passage_width > platform_width + 20:
+                    x = random.randint(int(left_bound + 10), int(right_bound - platform_width - 10))
                 else:
-                    passage_width = right_bound - left_bound
-                    platform_width = min(40, passage_width - 10)
-                    if passage_width < 40 or platform_width < 25:
-                        break
-                    if passage_width > platform_width + 20:
-                        x = random.randint(int(left_bound + 10), int(right_bound - platform_width - 10))
-                    else:
-                        x = int((left_bound + right_bound) // 2 - platform_width // 2)
-                    platform = self.generate_volcano_platform(x, y, current_level)
+                    x = int((left_bound + right_bound) // 2 - platform_width // 2)
+                platform = Platform(x, y, w=platform_width, moving=random.random()<0.1)
+                platform.crumbling = random.random() < 0.18
                 self.platforms.append(platform)
                 current_y = y
-                platforms_count += 1
         else:
             start_platform_x = max(50, min(player.x - PLATFORM_WIDTH // 2, SCREEN_WIDTH - PLATFORM_WIDTH - 50))
             current_level_for_platform = current_level
@@ -192,45 +204,23 @@ class PlatformManager:
                     crater_height = total_height * 0.9
                 if current_level == "Vulcano" and crater_height is not None:
                     absolute_height = self.background_manager.volcano_total_scroll + (SCREEN_HEIGHT - y)
-                    # Permetti la generazione di piattaforme fino a un buffer sopra il cratere
-                    buffer = SCREEN_HEIGHT * 1.5  # 1.5 schermi sopra il cratere
-                    if absolute_height >= crater_height + buffer:
+                    # Genera piattaforme fino al cratere, ignorando i limiti delle pareti
+                    if absolute_height >= crater_height:
                         break
                 if current_level == "Vulcano":
+                    # Genera piattaforme in stile doodle jump tra le pareti del vulcano
                     left_bound, right_bound = self.get_volcano_platform_bounds(y)
-                    # Se bounds non validi, genera piattaforma centrale di emergenza
-                    if left_bound is None or right_bound is None:
+                    if left_bound is None or right_bound is None or right_bound - left_bound < 40:
                         x = SCREEN_WIDTH // 2 - PLATFORM_WIDTH // 2
-                        platform = self.generate_volcano_platform(x, y, current_level)
-                        self.platforms.append(platform)
-                        added_platforms += 1
-                        continue
-                    passage_width = right_bound - left_bound
-                    platform_width = min(PLATFORM_WIDTH - 15, 50, passage_width - 10)
-                    if passage_width < 40 or platform_width < 30:
-                        x = SCREEN_WIDTH // 2 - PLATFORM_WIDTH // 2
-                        platform = self.generate_volcano_platform(x, y, current_level)
-                        self.platforms.append(platform)
-                        added_platforms += 1
-                        continue
-                    # Cast a int per tutti i parametri
-                    left_bound = int(left_bound)
-                    right_bound = int(right_bound)
-                    platform_width = int(platform_width)
-                    if needs_reachable_platform and len(self.platforms) > 1:
-                        center_x = int((left_bound + right_bound) // 2)
-                        max_reach = int(min(150, (right_bound - left_bound) // 3))
-                        x_start = max(int(left_bound + 10), center_x - max_reach)
-                        x_end = min(int(right_bound - platform_width - 10), center_x + max_reach)
-                        if x_end > x_start:
-                            x = random.randint(x_start, x_end)
-                        else:
-                            x = center_x - platform_width // 2
                     else:
-                        if right_bound - left_bound > platform_width + 20:
-                            x = random.randint(int(left_bound + 10), int(right_bound - platform_width - 10))
-                        else:
-                            x = int((left_bound + right_bound) // 2 - platform_width // 2)
+                        x = random.randint(int(left_bound + 5), int(right_bound - PLATFORM_WIDTH - 5))
+                    # Probabilità piattaforma crollante
+                    is_crumbling = random.random() < 0.18  # 18% di probabilità
+                    platform = self.generate_volcano_platform(x, y, current_level)
+                    platform.crumbling = is_crumbling
+                    self.platforms.append(platform)
+                    added_platforms += 1
+                    continue
                 else:
                     if needs_reachable_platform and len(self.platforms) > 1:
                         center_x = SCREEN_WIDTH // 2
@@ -250,7 +240,6 @@ class PlatformManager:
 
     def check_collision(self,player):
         player.on_ground = False  # Reset dello stato a terra
-        
         for p in self.platforms:
             if player.get_rect().colliderect(p.rect):
                 # Calcola la sovrapposizione
@@ -258,25 +247,26 @@ class PlatformManager:
                 player_top = player.y - player.radius
                 player_left = player.x - player.radius
                 player_right = player.x + player.radius
-                
                 platform_top = p.rect.top
                 platform_bottom = p.rect.bottom
                 platform_left = p.rect.left
                 platform_right = p.rect.right
-                
                 # Controlla se il player sta atterrando sulla piattaforma dall'alto
                 if (player.vy >= 0 and  # Player che cade o fermo
                     player_bottom >= platform_top and  # Player sopra la piattaforma
                     player_bottom <= platform_top + 15 and  # Margine di tolleranza
                     player_right > platform_left + 5 and  # Sovrapposizione orizzontale
                     player_left < platform_right - 5):
-                    
                     # Posiziona il player esattamente sulla piattaforma e fallo saltare
                     player.y = platform_top - player.radius
                     player.vy = -player.jump_strength
                     player.on_ground = True
-                    
+                    # Se la piattaforma è crollante, avvia timer crollo
+                    if hasattr(p, 'crumbling') and p.crumbling and p.crumble_timer is None:
+                        p.crumble_timer = 30  # frame di attesa prima del crollo (~0.5s a 60fps)
                     break  # Esci dal loop una volta trovata una collisione
+        # Rimuovi piattaforme crollate
+        self.platforms = [plat for plat in self.platforms if not (hasattr(plat, 'crumbling') and plat.crumbling and plat.crumble_timer is not None and plat.crumble_timer <= 0)]
 
     def draw(self,screen):
         for p in self.platforms:

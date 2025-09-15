@@ -51,6 +51,8 @@ def calculate_score():
     return score
 
 def init_game():
+    # Reset tracking per punteggio salita
+    update_game.last_score_scroll = 0
     """Inizializza una nuova partita."""
     global player, platform_manager, level_manager, background_manager, enemy_manager
     global total_scroll_distance, cooling_time, victory_fountain_active, fountain_start_time
@@ -73,10 +75,10 @@ def init_game():
         player.y = first_platform.rect.top - player.radius - 5
 
     # Genera bolle di magma sulle piattaforme
-    spawn_magma_bubbles_on_platforms(platform_manager)
+        spawn_magma_bubbles_on_platforms(platform_manager, density=1.0 if level_manager.get_current_level()['name'] == 'Mantello' else 0.8)
     
     total_scroll_distance = 0
-    cooling_time = GAME_TIME
+    cooling_time = GAME_TIME  # 2 minuti
     score = 0
     # Reset vittoria
     reset_victory_state()
@@ -84,6 +86,7 @@ def init_game():
 
 
 def update_game(dt):
+    global score
     """Aggiorna la logica di gioco."""
     global total_scroll_distance, game_state, final_score, cooling_time
 
@@ -134,6 +137,7 @@ def update_game(dt):
                 player.x = SCREEN_WIDTH - 50 - player.radius
                 player.vx = 0
 
+
         # Scroll verticale
         dy = 0
         if player.y < SCREEN_HEIGHT * 0.4:
@@ -142,6 +146,13 @@ def update_game(dt):
             platform_manager.update(dy, level_manager)
             background_manager.update(dy, total_scroll_distance)
             total_scroll_distance += dy
+
+            # Incrementa il punteggio ogni 100 pixel di salita (basato su total_scroll_distance)
+            if not hasattr(update_game, "last_score_scroll"):
+                update_game.last_score_scroll = 0
+            while total_scroll_distance - update_game.last_score_scroll >= 100:
+                score += 100
+                update_game.last_score_scroll += 100
 
             # Quando vengono aggiunte nuove piattaforme, aggiungi bolle di magma solo se non bloccato
             global block_on_demand_collectibles
@@ -182,7 +193,6 @@ def update_game(dt):
         update_collectibles(dt)
 
         # Gestione raccolta bolle di magma
-        global score
         collected_score = check_collectibles_collision(player)
         if collected_score > 0:
             score += (collected_score // 200) * 100  # 100 punti per ogni bolla raccolta (valore 200)
