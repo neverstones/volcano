@@ -166,7 +166,7 @@ def update_game(dt):
         level_manager.update(total_scroll_distance)
         new_level = level_manager.get_current_level()['name']
         if new_level != old_level:
-            # Cambio livello: genera subito piattaforme profonde per la nuova sezione
+            # Cambio livello immediato
             platform_manager.generate_initial_platforms(player, level_manager, depth_multiplier=8)
             spawn_magma_bubbles_on_platforms(platform_manager)
             block_on_demand_collectibles = True

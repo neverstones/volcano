@@ -25,15 +25,15 @@ class WobblyBall:
         self.max_health = 3
         self.invulnerable_time = 0
 
-        self.jump_strength = 15  # Ridotto da 18 a 15 per un salto più controllato
+        self.jump_strength = 18  # Aumentato per salto più facile
         self.on_ground = False
 
     def get_rect(self):
         return pygame.Rect(self.x - self.radius, self.y - self.radius, self.radius*2, self.radius*2)
 
     def apply_input(self, keys):
-        accel = 1.5  # Aumentato da 1.2 per più controllo orizzontale
-        max_speed = 10  # Aumentato da 8 per raggiungere piattaforme più distanti
+        accel = 1.8  # Ancora più reattivo
+        max_speed = 12  # Più veloce a destra/sinistra
         friction = 0.85
         if 'thermal_boost' in self.active_powerups:
             accel *= 1.5

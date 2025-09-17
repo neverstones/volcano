@@ -8,9 +8,10 @@ penalties = {
     "olivina": 10,
     "pirosseno": 16, 
     "anfibolo": 20,
+    "plagioclasio": 18,
     "biotite": 24,
     "feldspato": 14,
-    "quarzo": 30,
+    "quarzo": 40,
 }
 
 # Proprietà grafiche per ogni minerale
@@ -38,6 +39,12 @@ mineral_properties = {
         "accent": (105, 105, 105),  # Grigio scuro
         "shape": "sheet",
         "size": 38
+    },
+    "plagioclasio":{
+        "color": (176, 196, 222),  # Azzurro acciaio
+        "accent": (119, 136, 153),  # Grigio ardesia chiaro
+        "shape": "block",
+        "size": 40
     },
     "feldspato": {
         "color": (255, 228, 196),  # Beige

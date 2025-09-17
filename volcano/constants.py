@@ -5,10 +5,10 @@ import pygame
 
 
 #Game time
-GAME_TIME = 120 + 60
+GAME_TIME = 300
 
 # Screen dimensions
-SCREEN_WIDTH = 700
+SCREEN_WIDTH = 1550
 SCREEN_HEIGHT = 800
 FPS = 60
 GRAVITY = 0.98

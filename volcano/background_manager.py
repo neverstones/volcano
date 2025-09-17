@@ -165,11 +165,9 @@ class BackgroundManager:
     def draw(self, screen):
         """Disegna tutti i tile del livello corrente e le pareti del cono vulcanico se necessario."""
         idx = int(self.current_index)
-        
-        # Nel vulcano, usa un sistema di background composito
+        # Cambio livello immediato, nessuna transizione
         if idx == self.volcano_level_index:
             self.draw_volcano_backgrounds(screen)
-            # Fontana centralizzata: aggiorna e disegna se attiva
             if self.fountain_active:
                 if self.fountain is None:
                     self.fountain = Fountain(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
@@ -177,11 +175,9 @@ class BackgroundManager:
                 self.fountain.update()
                 self.fountain.draw(screen)
         else:
-            # Altri livelli: disegna normalmente
             for offset in self.tile_offsets[idx]:
                 screen.blit(self.layers[idx][0], (0, offset))
-
-        # Disegna le pareti del cono vulcanico solo nel livello vulcano
+        # Pareti vulcano
         if idx == self.volcano_level_index:
             self.draw_volcano_cone(screen)
 
