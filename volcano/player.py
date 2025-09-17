@@ -5,6 +5,14 @@ def lerp_color(c1, c2, t):
     return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
 
 class WobblyBall:
+    def play_jump_sound(self):
+        try:
+            from audio_manager import AudioManager
+            import __main__
+            if hasattr(__main__, 'audio_manager'):
+                __main__.audio_manager.play('jump')
+        except Exception as e:
+            print(f"DEBUG: errore suono salto automatico: {e}")
     def __init__(self, x, y, radius=PLAYER_RADIUS, color=(255,165,0)):
         self.x = float(x)
         self.y = float(y)

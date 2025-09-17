@@ -1,4 +1,5 @@
 import pygame
+import os
 import sys
 import random
 import time
@@ -14,13 +15,22 @@ from ui_system import UISystem
 from save_system import add_score
 from fountain import Fountain, reset_victory_state, start_victory_fountain, update_victory_fountain, is_victory_active, get_victory_timer, get_fountain, set_victory_active
 import game_states
+from audio_manager import AudioManager
+
+pygame.init()
+try:
+    pygame.mixer.init()
+    print(f"DEBUG: mixer init -> {pygame.mixer.get_init()}")
+except Exception as e:
+    print(f"DEBUG: mixer init fallita: {e}")
 
 # --- Inizializza pygame ---
-pygame.init()
+
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+audio_manager = AudioManager(os.path.join(os.path.dirname(__file__), 'audio'))
+print(f"DEBUG: audio_manager.sounds = {audio_manager.sounds}")
 pygame.display.set_caption("Volcano Wobbly Jump")
 clock = pygame.time.Clock()
-
 
 # --- Sistemi di gioco ---
 
@@ -95,6 +105,30 @@ def update_game(dt):
 
     # Aggiorna SEMPRE il movimento delle piattaforme mobili (anche senza scroll)
     platform_manager.update(0, level_manager)
+
+    # Musica di background: Mantello o fontana
+    current_level_name = level_manager.get_current_level()['name']
+    if not hasattr(update_game, "last_bg_level"):
+        update_game.last_bg_level = None
+    if is_victory_active() and game_state != MENU:
+        if update_game.last_bg_level != "ERUPTION":
+            audio_manager.play_background_eruption(os.path.join(os.path.dirname(__file__), 'audio'))
+            update_game.last_bg_level = "ERUPTION"
+    elif update_game.last_bg_level == "ERUPTION" and game_state == MENU:
+        audio_manager.stop_background()
+        update_game.last_bg_level = None
+    elif current_level_name == "Mantello" and update_game.last_bg_level != "Mantello":
+        audio_manager.play_background_lava(os.path.join(os.path.dirname(__file__), 'audio'))
+        update_game.last_bg_level = "Mantello"
+    elif current_level_name == "Vulcano" and not is_victory_active() and update_game.last_bg_level != "WIND":
+        audio_manager.play_background_wind(os.path.join(os.path.dirname(__file__), 'audio'))
+        update_game.last_bg_level = "WIND"
+    elif current_level_name != "Vulcano" and update_game.last_bg_level == "WIND":
+        audio_manager.stop_background()
+        update_game.last_bg_level = current_level_name
+    elif current_level_name != "Mantello" and update_game.last_bg_level == "Mantello":
+        audio_manager.stop_background()
+        update_game.last_bg_level = current_level_name
     
     # Controlla se ha raggiunto il cratere
     if background_manager and background_manager.check_crater_reached(total_scroll_distance):
@@ -118,11 +152,16 @@ def update_game(dt):
     # Aggiorna player solo se non in modalità fontana
     if not is_victory_active():
         keys = pygame.key.get_pressed()
+        # Suono salto
+        if keys[pygame.K_SPACE] and hasattr(player, 'on_ground') and player.on_ground:
+            audio_manager.play('jump')
         player.apply_input(keys)
         player.update(dt)
 
         # Collisioni piattaforme
-        platform_manager.check_collision(player)
+        jump_automatico = platform_manager.check_collision(player)
+        if jump_automatico:
+            audio_manager.play('jump')
 
         # Collisioni con pareti del vulcano (solo nel livello vulcano)
         if level_manager.get_current_level()['name'] == "Vulcano":
@@ -196,15 +235,17 @@ def update_game(dt):
         collected_score = check_collectibles_collision(player)
         if collected_score > 0:
             score += (collected_score // 200) * 100  # 100 punti per ogni bolla raccolta (valore 200)
+            audio_manager.play('bubble')
 
         # Se la fontana è attiva, aggiorna timer (fontana gestita automaticamente nel background_manager)
         if is_victory_active():
             victory_timer = update_victory_fountain()
             if victory_timer >= 10:
                 final_score = calculate_score()
-                ui_system.reset_input()
-                game_state = ENTER_NAME
-                return
+        if collected_score > 0:
+            score += (collected_score // 200) * 100  # 100 punti per ogni bolla raccolta (valore 200)
+            audio_manager.play('bubble')
+            return
 
         # Controllo game over (solo se non in modalità vittoria)
         if not is_victory_active() and (player.y - player.radius > SCREEN_HEIGHT or cooling_time <= 0):
@@ -237,7 +278,6 @@ def draw_game(screen):
     # HUD
     font = pygame.font.SysFont(None, 30)
     small_font = pygame.font.SysFont(None, 24)
-    
     if not is_victory_active():
         # Livello e punteggio a sinistra
         text_level = font.render(f"Livello: {level_manager.get_current_level()['name']}", True, (255, 255, 255))
@@ -247,7 +287,7 @@ def draw_game(screen):
         score_text = font.render(f"Punteggio: {current_score}", True, (255, 255, 255))
         screen.blit(score_text, (10, 40))
 
-    # Barra di raffreddamento in alto a destra
+        # Barra di raffreddamento in alto a destra
         ui_system.draw_cooling_bar(screen, cooling_time, GAME_TIME)
     else:
         # Messaggio vittoria con timer
@@ -311,7 +351,6 @@ while running:
                 name = ui_system.input_text.strip()
                 result, scores = add_score(name, final_score)
                 if result == 'duplicate':
-                    import pygame
                     font = pygame.font.SysFont(None, 32)
                     msg = f"Il nome '{name}' esiste già. Sovrascrivere? (S/N)"
                     text_surf = font.render(msg, True, (255,255,0))

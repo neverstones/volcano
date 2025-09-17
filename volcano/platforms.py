@@ -255,7 +255,9 @@ class PlatformManager:
             highest_y = min(p.rect.y for p in self.platforms) if self.platforms else "N/A"
             print(f"Platforms: removed={removed_platforms}, added={added_platforms}, total={len(self.platforms)}, highest_y={highest_y}")
 
-    def check_collision(self,player):
+    def check_collision(self, player):
+        from audio_manager import AudioManager
+        import os
         player.on_ground = False  # Reset dello stato a terra
         for p in self.platforms:
             if player.get_rect().colliderect(p.rect):
@@ -278,6 +280,9 @@ class PlatformManager:
                     player.y = platform_top - player.radius
                     player.vy = -player.jump_strength
                     player.on_ground = True
+                    # Suono salto automatico
+                    if hasattr(player, 'play_jump_sound'):
+                        player.play_jump_sound()
                     # Se la piattaforma è crollante, avvia timer crollo
                     if hasattr(p, 'crumbling') and p.crumbling and p.crumble_timer is None:
                         p.crumble_timer = 30  # frame di attesa prima del crollo (~0.5s a 60fps)
