@@ -219,6 +219,9 @@ def update_game(dt):
         hits = enemy_manager.check_collision(player)
         for enemy in hits:
             cooling_time -= penalties.get(enemy.kind, 5)
+            print(f"DEBUG: collisione con nemico/minerale {enemy.kind}, timer abbassato a {cooling_time}")
+            audio_manager.play('enemy_hit')
+            print(f"DEBUG: chiamata audio_manager.play('enemy_hit')")
             enemy_manager.enemies.remove(enemy)
 
         # Controllo cratere raggiunto (solo nel livello vulcano)
@@ -235,7 +238,7 @@ def update_game(dt):
         collected_score = check_collectibles_collision(player)
         if collected_score > 0:
             score += (collected_score // 200) * 100  # 100 punti per ogni bolla raccolta (valore 200)
-            audio_manager.play('bubble')
+            audio_manager.play('collect')
 
         # Se la fontana è attiva, aggiorna timer (fontana gestita automaticamente nel background_manager)
         if is_victory_active():

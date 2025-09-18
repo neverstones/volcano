@@ -36,6 +36,16 @@ class AudioManager:
 
     def play(self, name):
         print(f"AudioManager: play chiamato per {name}")
+        if name == 'enemy_hit':
+            print(f"AudioManager: genero procedural buzz per enemy_hit (come il pling)")
+            sound = self.create_tone(220, 0.13, volume=0.7)
+            if sound:
+                print(f"DEBUG: Procedural enemy_hit buzz creato, provo a riprodurre...")
+                sound.play()
+                print(f"DEBUG: Procedural enemy_hit buzz riprodotto.")
+            else:
+                print(f"DEBUG: Procedural enemy_hit buzz fallito.")
+            return
         sound = self.sounds.get(name)
         if sound:
             print(f"AudioManager: riproduco suono {name}")
@@ -45,4 +55,4 @@ class AudioManager:
             except Exception as e:
                 print(f"AudioManager: ERRORE riproduzione {name}: {e}")
         else:
-            print(f"AudioManager: suono {name} non trovato")
+            print(f"AudioManager: suono {name} non trovato.")

@@ -7,6 +7,45 @@ import os
 from constants import AUDIO_FREQUENCY, AUDIO_BUFFER
 
 class AudioManager:
+    def __init__(self, base_path):
+        self.sounds = {}
+        self.music_playing = False
+        self.audio_available = pygame.mixer is not None
+        if self.audio_available:
+            try:
+                # Suono salto automatico
+                fire_whoosh_path = os.path.join(base_path, 'fire-whoosh.wav')
+                if os.path.exists(fire_whoosh_path):
+                    self.sounds['jump'] = pygame.mixer.Sound(fire_whoosh_path)
+                    self.sounds['jump'].set_volume(0.35)
+                    print(f"DEBUG: fire-whoosh.wav caricato correttamente: {fire_whoosh_path} (volume 0.35)")
+                else:
+                    print(f"DEBUG: fire-whoosh.wav non trovato, uso suono procedurale")
+                    self.sounds['jump'] = self.create_tone(300, 0.1)
+                # Suono raccolta oggetto
+                collect_path = os.path.join(base_path, 'collectible.wav')
+                if os.path.exists(collect_path):
+                    self.sounds['collect'] = pygame.mixer.Sound(collect_path)
+                    self.sounds['collect'].set_volume(0.5)
+                    print(f"DEBUG: collectible.wav caricato correttamente: {collect_path}")
+                else:
+                    # Suono arcade tipo 'pling'
+                    self.sounds['collect'] = self.create_tone(1400, 0.09)
+                # Suono collisione nemico
+                enemy_hit_path = os.path.join(base_path, 'enemy_hit.wav')
+                if os.path.exists(enemy_hit_path):
+                    self.sounds['enemy_hit'] = pygame.mixer.Sound(enemy_hit_path)
+                    self.sounds['enemy_hit'].set_volume(0.5)
+                    print(f"DEBUG: enemy_hit.wav caricato correttamente: {enemy_hit_path}")
+                else:
+                    self.sounds['enemy_hit'] = self.create_tone(200, 0.3)
+                # Altri suoni
+                self.sounds['powerup'] = self.create_tone(500, 0.3)
+                self.sounds['lava_hit'] = self.create_tone(150, 0.5)
+                self.sounds['eruption'] = self.create_tone(100, 1.0)
+            except Exception as e:
+                print(f"Audio non disponibile: {e}")
+                self.audio_available = False
     def play_background_eruption(self, base_path):
         eruption_path = os.path.join(base_path, 'erupting_volcano.wav')
         if os.path.exists(eruption_path):
