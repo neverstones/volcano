@@ -5,13 +5,13 @@ from constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 # penalità secondi per tipo minerale
 penalties = {
-    "olivina": 10,
-    "pirosseno": 16, 
-    "anfibolo": 20,
-    "plagioclasio": 18,
-    "biotite": 24,
-    "feldspato": 14,
-    "quarzo": 40,
+    "olivina": 1,
+    "pirosseno": 2, 
+    "anfibolo": 2,
+    "plagioclasio": 2,
+    "biotite": 3,
+    "feldspato": 2,
+    "quarzo": 3,
 }
 
 # Proprietà grafiche per ogni minerale
@@ -84,6 +84,11 @@ class Enemy(pygame.sprite.Sprite):
         # Oscillazione durante la caduta
         self.oscillation = random.uniform(0, math.pi * 2)
         self.oscillation_speed = random.uniform(0.02, 0.05)
+        
+        # Testo animato
+        self.float_text = None
+        self.float_timer = 0
+        self.float_y = 0
 
     def _draw_mineral(self):
         """Disegna il minerale con forma caratteristica."""
@@ -159,6 +164,12 @@ class Enemy(pygame.sprite.Sprite):
         self.image.blit(shadow, (text_rect.x + 1, text_rect.y + 1))
         self.image.blit(text, text_rect)
 
+    def trigger_float_text(self, text="PENALITÀ!"):
+
+        self.float_text = text
+        self.float_timer = 0
+        self.float_y = 0
+
     def update(self):
         # Movimento con oscillazione naturale
         self.oscillation += self.oscillation_speed
@@ -178,6 +189,13 @@ class Enemy(pygame.sprite.Sprite):
             self.rect.right = SCREEN_WIDTH - 50
             self.speedx = -abs(self.speedx) * 0.8
 
+        # Aggiorna testo animato
+        if self.float_text:
+            self.float_timer += 0.016  # ~60 FPS
+            self.float_y -= 30 * 0.016
+            if self.float_timer > 1.0:
+                self.float_text = None
+
     def draw(self, screen):
         # Disegna con rotazione se necessario
         if abs(self.rotation_speed) > 0.1:
@@ -185,9 +203,19 @@ class Enemy(pygame.sprite.Sprite):
             rotated = pygame.transform.rotate(self.image, self.rotation)
             rotated_rect = rotated.get_rect(center=self.rect.center)
             screen.blit(rotated, rotated_rect)
+            draw_pos = rotated_rect.center
         else:
             screen.blit(self.image, self.rect.topleft)
+            draw_pos = self.rect.center
 
+        # Testo animato rosso stile collectibles
+        if self.float_text:
+            font = pygame.font.SysFont(None, 32)
+            alpha = max(0, 255 - int(self.float_timer * 255))
+            text_surf = font.render(self.float_text, True, (255,0,0))
+            text_surf.set_alpha(alpha)
+            x, y = draw_pos
+            screen.blit(text_surf, (x-18, y + self.float_y))
 
 class EnemyManager:
     def __init__(self):

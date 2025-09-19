@@ -6,6 +6,21 @@ class AudioManager:
         self.sounds = {}
         self.base_path = base_path
         self._load_sounds()
+        # Carica punch.wav una sola volta
+        punch_path = os.path.join(self.base_path, 'punch.wav')
+        print(f"DEBUG: path usato per punch.wav: {punch_path}")
+        if os.path.exists(punch_path):
+            try:
+                self.sounds['enemy_hit'] = pygame.mixer.Sound(punch_path)
+                self.sounds['enemy_hit'].set_volume(0.7)
+                print(f"DEBUG: punch.wav caricato correttamente: {punch_path}")
+            except Exception as e:
+                print(f"DEBUG: Errore caricamento punch.wav: {e}")
+        else:
+            print(f"DEBUG: punch.wav non trovato in {punch_path}")
+        print(f"DEBUG: suoni caricati dopo punch: {list(self.sounds.keys())}")
+        if 'enemy_hit' not in self.sounds:
+            print("ATTENZIONE: punch.wav NON caricato! Nessun suono per collisione minerale.")
 
     def _load_sounds(self):
         for key, filename in {
@@ -37,14 +52,12 @@ class AudioManager:
     def play(self, name):
         print(f"AudioManager: play chiamato per {name}")
         if name == 'enemy_hit':
-            print(f"AudioManager: genero procedural buzz per enemy_hit (come il pling)")
-            sound = self.create_tone(220, 0.13, volume=0.7)
+            sound = self.sounds.get('enemy_hit')
             if sound:
-                print(f"DEBUG: Procedural enemy_hit buzz creato, provo a riprodurre...")
                 sound.play()
-                print(f"DEBUG: Procedural enemy_hit buzz riprodotto.")
+                print(f"DEBUG: punch.wav riprodotto per enemy_hit.")
             else:
-                print(f"DEBUG: Procedural enemy_hit buzz fallito.")
+                print(f"DEBUG: punch.wav non caricato.")
             return
         sound = self.sounds.get(name)
         if sound:

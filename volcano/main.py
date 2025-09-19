@@ -4,7 +4,7 @@ import sys
 import random
 import time
 from constants import (SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GAME_TIME, 
-                      MENU, PLAYING, GAME_OVER, SCORE_LIST, ENTER_NAME)
+                      MENU, PLAYING, GAME_OVER, SCORE_LIST, ENTER_NAME, PLATFORM_WIDTH, PLATFORM_HEIGHT)
 from player import WobblyBall
 from platforms import PlatformManager
 from collectibles import Collectible, spawn_magma_bubbles_on_platforms, add_magma_bubble_for_platform, update_collectibles, draw_collectibles, check_collectibles_collision, get_world_offset, collectibles, block_on_demand_collectibles
@@ -207,6 +207,14 @@ def update_game(dt):
         if new_level != old_level:
             # Cambio livello immediato
             platform_manager.generate_initial_platforms(player, level_manager, depth_multiplier=8)
+            # --- PATCH: garantisci piattaforma sotto il player ---
+            piattaforme_sotto = [p for p in platform_manager.platforms if p.rect.top > player.y and p.rect.top - player.y < 150]
+            if len(piattaforme_sotto) < 1:
+                from platforms import Platform
+                px = int(player.x - PLATFORM_WIDTH // 2)
+                py = int(player.y + player.radius + 40)
+                if py < SCREEN_HEIGHT - 30:  # Assicura che sia visibile
+                    platform_manager.platforms.append(Platform(px, py, PLATFORM_WIDTH, PLATFORM_HEIGHT))
             spawn_magma_bubbles_on_platforms(platform_manager)
             block_on_demand_collectibles = True
         else:
@@ -218,11 +226,13 @@ def update_game(dt):
         # Collisione nemici
         hits = enemy_manager.check_collision(player)
         for enemy in hits:
-            cooling_time -= penalties.get(enemy.kind, 5)
-            print(f"DEBUG: collisione con nemico/minerale {enemy.kind}, timer abbassato a {cooling_time}")
-            audio_manager.play('enemy_hit')
-            print(f"DEBUG: chiamata audio_manager.play('enemy_hit')")
-            enemy_manager.enemies.remove(enemy)
+            penalty_seconds = penalties.get(enemy.kind, 10)
+            cooling_time -= penalty_seconds  # penalità in secondi
+            cooling_time = max(0, cooling_time)  # non scendere sotto zero
+            print(f"DEBUG: collisione con nemico/minerale {enemy.kind}, penalty {penalty_seconds} sec, timer abbassato a {cooling_time}")
+            enemy.trigger_float_text("CRISTALLIZZAZIONE FRAZIONATA, RAFFREDDAMENTO!")
+            print(f"DEBUG: testo PENALITÀ! attivato su nemico/minerale")
+            # Il nemico viene rimosso solo dopo che il testo è scomparso (gestione da EnemyManager se serve)
 
         # Controllo cratere raggiunto (solo nel livello vulcano)
         if level_manager.get_current_level()['name'] == "Vulcano" and not is_victory_active():
@@ -248,10 +258,13 @@ def update_game(dt):
         if collected_score > 0:
             score += (collected_score // 200) * 100  # 100 punti per ogni bolla raccolta (valore 200)
             audio_manager.play('bubble')
+            audio_manager.play('enemy_hit')  # TEST: riproduci enemy_hit anche qui
+            print("DEBUG: TEST enemy_hit riprodotto su raccolta bolla")
             return
 
         # Controllo game over (solo se non in modalità vittoria)
-        if not is_victory_active() and (player.y - player.radius > SCREEN_HEIGHT or cooling_time <= 0):
+        nemici_animati = any(getattr(e, 'float_text', None) for e in enemy_manager.enemies)
+        if not is_victory_active() and (player.y - player.radius > SCREEN_HEIGHT or (cooling_time <= 0 and not nemici_animati)):
             final_score = calculate_score()
             game_state = GAME_OVER
 
