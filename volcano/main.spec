@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('assets', 'assets'), ('audio', 'audio'), ('volcano_scores.json', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

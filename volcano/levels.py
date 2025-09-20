@@ -1,4 +1,11 @@
 import pygame
+import sys, os
+
+# Funzione per path portatile (PyInstaller)
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT, LEVEL_HEIGHT
 
 # --- Definizione dei livelli ---
@@ -17,7 +24,7 @@ class LevelManager:
         # Carica tutte le immagini dei livelli
         self.backgrounds = []
         for level in self.level_defs:
-            img = pygame.image.load(level["bg"]).convert_alpha()
+            img = pygame.image.load(resource_path(level["bg"])).convert_alpha()
             img = pygame.transform.scale(img, (SCREEN_WIDTH, SCREEN_HEIGHT))
             self.backgrounds.append(img)
 

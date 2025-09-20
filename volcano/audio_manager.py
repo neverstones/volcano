@@ -2,6 +2,13 @@
 Audio system for the volcano game.
 """
 import pygame
+import sys, os
+
+# Funzione per path portatile (PyInstaller)
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 import math
 import os
 from constants import AUDIO_FREQUENCY, AUDIO_BUFFER
@@ -13,7 +20,7 @@ class AudioManager:
         self.audio_available = pygame.mixer is not None
         if self.audio_available:
             # Suono salto automatico
-            fire_whoosh_path = os.path.join(base_path, 'fire-whoosh.wav')
+            fire_whoosh_path = resource_path(os.path.join(base_path, 'fire-whoosh.wav'))
             if os.path.exists(fire_whoosh_path):
                 self.sounds['jump'] = pygame.mixer.Sound(fire_whoosh_path)
                 self.sounds['jump'].set_volume(0.35)
@@ -22,7 +29,7 @@ class AudioManager:
                 print(f"DEBUG: fire-whoosh.wav non trovato, uso suono procedurale")
                 self.sounds['jump'] = self.create_tone(300, 0.1)
             # Suono raccolta oggetto
-            collect_path = os.path.join(base_path, 'collectible.wav')
+            collect_path = resource_path(os.path.join(base_path, 'collectible.wav'))
             if os.path.exists(collect_path):
                 self.sounds['collect'] = pygame.mixer.Sound(collect_path)
                 self.sounds['collect'].set_volume(0.5)

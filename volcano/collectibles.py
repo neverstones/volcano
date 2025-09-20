@@ -6,35 +6,33 @@ from constants import SCREEN_HEIGHT
 collectibles = []
 block_on_demand_collectibles = False
 
-def spawn_magma_bubbles_on_platforms(platform_manager, density=0.8):
-    """Posiziona una bolla di magma su ogni piattaforma di ogni livello, senza offset y. density=1.0 per massima densità."""
+def spawn_magma_bubbles_on_platforms(platform_manager, density=1.0):
+    """Posiziona una bolla di magma su tutte le piattaforme."""
     global collectibles
     collectibles = []
     for plat in platform_manager.platforms:
-        if random.random() < density:
-            if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
-                x = plat.rect.centerx
-                radius = 10  # Deve corrispondere a Collectible.radius
-                offset = 16  # Spazio extra tra piattaforma e bolla
-                y_bubble = plat.rect.top - offset - radius
-                bubble = Collectible(x, y_bubble, value=200)
-                bubble.type = 'magma_bubble'
-                bubble.platform = plat  # Associa la piattaforma
-                collectibles.append(bubble)
-
-def add_magma_bubble_for_platform(plat):
-    """Aggiunge una bolla di magma su ogni nuova piattaforma, senza offset y."""
-    global collectibles
-    if random.random() < 0.8:
         if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
             x = plat.rect.centerx
             radius = 10  # Deve corrispondere a Collectible.radius
             offset = 16  # Spazio extra tra piattaforma e bolla
-            y = plat.rect.top - offset - radius
-            bubble = Collectible(x, y, value=200)
+            y_bubble = plat.rect.top - offset - radius
+            bubble = Collectible(x, y_bubble, value=200)
             bubble.type = 'magma_bubble'
             bubble.platform = plat  # Associa la piattaforma
             collectibles.append(bubble)
+
+def add_magma_bubble_for_platform(plat):
+    """Aggiunge SEMPRE una bolla di magma su ogni nuova piattaforma, senza offset y."""
+    global collectibles
+    if not any(c.type == 'magma_bubble' and c.platform == plat for c in collectibles):
+        x = plat.rect.centerx
+        radius = 10  # Deve corrispondere a Collectible.radius
+        offset = 16  # Spazio extra tra piattaforma e bolla
+        y = plat.rect.top - offset - radius
+        bubble = Collectible(x, y, value=200)
+        bubble.type = 'magma_bubble'
+        bubble.platform = plat  # Associa la piattaforma
+        collectibles.append(bubble)
 
 def update_collectibles(dt):
     global collectibles

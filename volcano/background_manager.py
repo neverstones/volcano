@@ -1,4 +1,11 @@
 import pygame
+import sys, os
+
+# Funzione per path portatile (PyInstaller)
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 import math
 import random
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT
@@ -21,20 +28,20 @@ class BackgroundManager:
 
         # Carica e scala le immagini
         for img_path in self.level_images:
-            img = pygame.image.load(img_path).convert_alpha()
+            img = pygame.image.load(resource_path(img_path)).convert_alpha()
             img = pygame.transform.scale(img, (SCREEN_WIDTH, SCREEN_HEIGHT))
             self.layers.append([img.copy() for _ in range(self.tiles_per_level)])
             self.tile_offsets.append([i * SCREEN_HEIGHT for i in range(self.tiles_per_level)])
 
         # Tile per i muri vulcanici
-        wall_img = pygame.image.load("assets/RoundedBlocks/stoneWall.png").convert_alpha()
+        wall_img = pygame.image.load(resource_path("assets/RoundedBlocks/stoneWall.png")).convert_alpha()
         self.wall_tile = pygame.transform.scale(wall_img, (32, 32))
-        
+
         # Immagine paesaggio esterno per il vulcano (scroll lento)
-        self.landscape_bg = pygame.image.load("assets/vector_ambient.png").convert()
+        self.landscape_bg = pygame.image.load(resource_path("assets/vector_ambient.png")).convert()
         self.landscape_bg = pygame.transform.scale(self.landscape_bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
         self.landscape_scroll = 0  # Scroll separato per il paesaggio
-        
+
         # Fontana di lava per il cratere
         self.fountain_active = False
         self.crater_mode = False
@@ -43,10 +50,16 @@ class BackgroundManager:
         # Parametri per il cono vulcanico (solo nel livello 2 - Vulcano)
         self.volcano_level_index = 2  # Livello vulcano
         self.cone_walls = []  # Lista delle pareti del cono per ogni tile
-        
+
         # Tracking assoluto per il vulcano (non dipende dal riciclaggio tile)
         self.volcano_total_scroll = 0
-        
+
+        # Variabili per transizione di livello
+        self.transitioning = False
+        self.transition_alpha = 0.0
+        self.transition_frames = 0
+        self.next_level_index = None
+
         self.setup_volcano_cone()
         
     def setup_volcano_cone(self):
@@ -90,14 +103,17 @@ class BackgroundManager:
         # Ogni livello è lungo circa 2000 pixel (constants.LEVEL_HEIGHT)
         LEVEL_HEIGHT = 2000
         new_level_index = min(int(total_scroll_distance // LEVEL_HEIGHT), len(self.level_images) - 1)
-        
-        # Se cambiamo livello, stampa il debug
-        if new_level_index != self.current_index:
+
+        # Se cambiamo livello, avvia la transizione
+        if new_level_index != self.current_index and not self.transitioning:
             level_names = ["Mantello", "Crosta", "Vulcano"]
             old_name = level_names[self.current_index] if self.current_index < len(level_names) else "Sconosciuto"
             new_name = level_names[new_level_index] if new_level_index < len(level_names) else "Sconosciuto"
             print(f"🌍 Cambio livello: {old_name} → {new_name} (scroll: {total_scroll_distance})")
-            self.current_index = new_level_index
+            self.transitioning = True
+            self.transition_alpha = 0.0
+            self.transition_frames = 0
+            self.next_level_index = new_level_index
         
         # Traccia lo scroll assoluto nel vulcano
         if self.current_index == self.volcano_level_index:
@@ -109,6 +125,11 @@ class BackgroundManager:
         self.tile_offsets[int(self.current_index)] = [
             offset + dy for offset in self.tile_offsets[int(self.current_index)]
         ]
+        # Aggiorna offset anche per il prossimo livello se in transizione
+        if self.transitioning and self.next_level_index is not None:
+            self.tile_offsets[int(self.next_level_index)] = [
+                offset + dy for offset in self.tile_offsets[int(self.next_level_index)]
+            ]
 
         # Riporta i tile sopra se escono sotto
         for i, offset in enumerate(self.tile_offsets[int(self.current_index)]):
@@ -165,21 +186,45 @@ class BackgroundManager:
     def draw(self, screen):
         """Disegna tutti i tile del livello corrente e le pareti del cono vulcanico se necessario."""
         idx = int(self.current_index)
-        # Cambio livello immediato, nessuna transizione
-        if idx == self.volcano_level_index:
-            self.draw_volcano_backgrounds(screen)
-            if self.fountain_active:
-                if self.fountain is None:
-                    self.fountain = Fountain(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-                self.fountain.emit()
-                self.fountain.update()
-                self.fountain.draw(screen)
-        else:
+        # Se in transizione, disegna entrambi i background con alpha
+        if self.transitioning and self.next_level_index is not None:
+            # Fading: alpha da 0 a 255 in 0.7s (~40 frame)
+            fade_frames = 40
+            self.transition_frames += 1
+            alpha = int(255 * (self.transition_frames / fade_frames))
+            alpha = min(255, alpha)
+            # Disegna background vecchio
             for offset in self.tile_offsets[idx]:
                 screen.blit(self.layers[idx][0], (0, offset))
-        # Pareti vulcano
-        if idx == self.volcano_level_index:
-            self.draw_volcano_cone(screen)
+            # Crea superficie temporanea per il nuovo livello
+            temp_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            for offset in self.tile_offsets[self.next_level_index]:
+                temp_surface.blit(self.layers[self.next_level_index][0], (0, offset))
+            temp_surface.set_alpha(alpha)
+            screen.blit(temp_surface, (0, 0))
+            # Quando alpha è pieno, termina la transizione
+            if self.transition_frames >= fade_frames:
+                self.current_index = self.next_level_index
+                self.transitioning = False
+                self.transition_alpha = 0.0
+                self.transition_frames = 0
+                self.next_level_index = None
+        else:
+            # Cambio livello normale
+            if idx == self.volcano_level_index:
+                self.draw_volcano_backgrounds(screen)
+                if self.fountain_active:
+                    if self.fountain is None:
+                        self.fountain = Fountain(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                    self.fountain.emit()
+                    self.fountain.update()
+                    self.fountain.draw(screen)
+            else:
+                for offset in self.tile_offsets[idx]:
+                    screen.blit(self.layers[idx][0], (0, offset))
+            # Pareti vulcano
+            if idx == self.volcano_level_index:
+                self.draw_volcano_cone(screen)
 
     def draw_volcano_backgrounds(self, screen):
         """Disegna i background del vulcano: vector_ambient esterno e shardRock interno."""

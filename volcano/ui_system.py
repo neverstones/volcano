@@ -106,13 +106,24 @@ class UISystem:
             color_value = int(20 + (y / SCREEN_HEIGHT) * 40)
             pygame.draw.line(screen, (color_value, color_value // 2, 0), (0, y), (SCREEN_WIDTH, y))
         
-        # Titolo
-        title = self.font_big.render("VOLCANO", True, self.orange)
+        # Titolo accattivante
+        try:
+            font_title = pygame.font.SysFont("Comic Sans MS", 80, bold=True)
+        except:
+            font_title = pygame.font.Font(None, 80)
+        title = font_title.render("Buuum Jump!", True, (255, 80, 0))
         title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, 150))
         screen.blit(title, title_rect)
-        
-        subtitle = self.font_medium.render("Wobbly Jump", True, self.white)
-        subtitle_rect = subtitle.get_rect(center=(SCREEN_WIDTH // 2, 200))
+
+        # Effetto ombra
+        shadow = font_title.render("Buuum Jump!", True, (80, 0, 0))
+        shadow_rect = shadow.get_rect(center=(SCREEN_WIDTH // 2 + 4, 154))
+        screen.blit(shadow, shadow_rect)
+
+        # Sottotitolo simpatico
+        font_sub = pygame.font.SysFont("Comic Sans MS", 40)
+        subtitle = font_sub.render("Salta, esplodi e divertiti!", True, (255, 200, 0))
+        subtitle_rect = subtitle.get_rect(center=(SCREEN_WIDTH // 2, 210))
         screen.blit(subtitle, subtitle_rect)
         
         # Opzioni menu

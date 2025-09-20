@@ -3,6 +3,13 @@ import os
 import sys
 import random
 import time
+
+# Funzione per path portatile (PyInstaller)
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+# Esempio: pygame.image.load(resource_path("assets/immagine.png"))
 from constants import (SCREEN_WIDTH, SCREEN_HEIGHT, FPS, GAME_TIME, 
                       MENU, PLAYING, GAME_OVER, SCORE_LIST, ENTER_NAME, PLATFORM_WIDTH, PLATFORM_HEIGHT)
 from player import WobblyBall
@@ -193,12 +200,11 @@ def update_game(dt):
                 score += 100
                 update_game.last_score_scroll += 100
 
-            # Quando vengono aggiunte nuove piattaforme, aggiungi bolle di magma solo se non bloccato
+            # Quando vengono aggiunte nuove piattaforme, aggiungi SEMPRE bolle di magma su tutte le piattaforme
             global block_on_demand_collectibles
             if not block_on_demand_collectibles:
-                for plat in platform_manager.platforms[-3:]:
-                    if not any(abs(c.x - plat.rect.centerx) < 5 and abs(c.y - (plat.rect.top - 12)) < 5 for c in collectibles if c.type == 'magma_bubble'):
-                        add_magma_bubble_for_platform(plat)
+                for plat in platform_manager.platforms:
+                    add_magma_bubble_for_platform(plat)
 
         # Aggiorna livello in base alla posizione
         old_level = level_manager.get_current_level()['name']

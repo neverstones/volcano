@@ -3,6 +3,13 @@ Sistema di salvataggio e gestione punteggi per il gioco Volcano
 """
 import json
 import os
+import sys
+
+# Funzione per path portatile (PyInstaller)
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 from datetime import datetime
 
 SCORES_FILE = "volcano_scores.json"
@@ -10,8 +17,9 @@ SCORES_FILE = "volcano_scores.json"
 def load_high_scores():
     """Carica i punteggi salvati da file."""
     try:
-        if os.path.exists(SCORES_FILE):
-            with open(SCORES_FILE, 'r', encoding='utf-8') as f:
+        scores_path = resource_path(SCORES_FILE)
+        if os.path.exists(scores_path):
+            with open(scores_path, 'r', encoding='utf-8') as f:
                 scores = json.load(f)
                 # Assicurati che sia una lista di dizionari con le chiavi corrette
                 valid_scores = []
@@ -26,7 +34,8 @@ def load_high_scores():
 def save_high_scores(scores):
     """Salva i punteggi su file."""
     try:
-        with open(SCORES_FILE, 'w', encoding='utf-8') as f:
+        scores_path = resource_path(SCORES_FILE)
+        with open(scores_path, 'w', encoding='utf-8') as f:
             json.dump(scores, f, indent=2, ensure_ascii=False)
         return True
     except Exception as e:
